@@ -1,3 +1,6 @@
+-- luacheck: std +busted
+-- luacheck: globals hs
+-- luacheck: globals assert (are (equal same) is_true is_nil)
 -- Busted tests for MacWatcher Spoon using the mock hs environment
 
 local mock = dofile("tests/mock_hs.lua")
