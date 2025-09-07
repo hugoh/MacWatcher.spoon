@@ -83,11 +83,11 @@ function M.setup()
 
   -- Task
   hs.task = {}
-  function hs.task.new(cmd, completionFn, streamFn, args)
+  function hs.task.new(_cmd, completionFn, streamFn, _args)
     local running = false
     local pid = 12345
     local task = {}
-    function task:start()
+    function task.start(_)
       running = true
       -- Simulate some output callbacks then completion
       if streamFn then streamFn(nil, "", "") end
@@ -95,10 +95,10 @@ function M.setup()
       running = false
       return true
     end
-    function task:closeInput() end
-    function task:terminate() running = false end
-    function task:isRunning() return running end
-    function task:pid() return pid end
+    function task.closeInput(_) end
+    function task.terminate(_) running = false end
+    function task.isRunning(_) return running end
+    function task.pid(_) return pid end
     return task
   end
 
