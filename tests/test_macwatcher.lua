@@ -135,4 +135,20 @@ describe("MacWatcher Spoon", function()
     w:_execute({}, nil)
     assert.is_true(true)
   end)
+	it("cooldown allows re-execution when args differ for same hook", function()
+		overrideExecute(w)
+		w.cooldown = 5
+
+		w:whenResume({ "x" }, 0)
+
+		mock._setTime(100)
+		w:_execHooks("resume", { "a" })
+		assert.are.equal(1, #w._executed)
+
+		mock._setTime(101)
+		w:_execHooks("resume", { "b" })
+		assert.are.equal(2, #w._executed)
+	end)
+
+	end)
 end)

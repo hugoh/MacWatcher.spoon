@@ -18,6 +18,7 @@ obj.hooks[SUSPEND] = {}
 obj.hooks[WIFI] = {}
 obj._timers = {}
 obj.cooldown = 5
+obj.lastArgs = nil
 obj.lastHook = nil
 obj.lastHookTime = 0
 obj.taskTimeout = 30
@@ -148,11 +149,25 @@ end
 
 function obj:onWifiChange(cmd, delay)
 	return self:_cmdAdd(WIFI, cmd, delay)
+local function tablesEqual(t1, t2)
+	if t1 == t2 then return true end
+	if type(t1) ~= "table" or type(t2) ~= "table" then return false end
+	if #t1 ~= #t2 then return false end
+	local keys1 = {}
+	for k, v in pairs(t1) do
+		if type(v) == "table" then return false end
+		if t2[k] ~= v then return false end
+		keys1[k] = true
+	end
+	for k in pairs(t2) do
+		if not keys1[k] then return false end
+	end
+	return true
 end
 
 function obj:_execHooks(hookType, args)
 	local currentTime = hs.timer.secondsSinceEpoch()
-	if hookType == self.lastHook then
+	if hookType == self.lastHook and tablesEqual(args, self.lastArgs) then
 		local last = currentTime - self.lastHookTime
 		if last < self.cooldown then
 			logger.df("Hooks for %s skipped due to cooldown: last run %f seconds ago < %f", hookType, last,
@@ -160,8 +175,9 @@ function obj:_execHooks(hookType, args)
 			return
 		end
 	else
-		logger.df("Resetting hooks cooldown for %s", hookType)
+		logger.df("Resetting hooks cooldown for %s with args %s", hookType, hs.inspect(args))
 		self.lastHook = hookType
+		self.lastArgs = args
 	end
 	self.lastHookTime = currentTime
 	logger.df("Executing hooks from %s", hookType)
