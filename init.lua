@@ -26,12 +26,8 @@ obj.taskTimeout = 30
 local logger = hs.logger.new(obj.name, "info")
 
 local function debugOut(label, data)
-	if logger.level < 4 then
-		return
-	end
-	if not data or data == "" then
-		return
-	end
+	if logger.level < 4 then return end
+	if not data or data == "" then return end
 	for line in data:gmatch("[^\r\n]+") do
 		logger.d(label .. ": " .. line)
 	end
@@ -48,9 +44,7 @@ function obj:_executeAsyncCmd(cmd, args)
 		--  Related https://github.com/Hammerspoon/hammerspoon/issues/3210
 		exitCode = exitCode or -1
 		logger.df("Exit code: %d", exitCode or -1)
-		if exitCode ~= 0 then
-			logger.ef("Execution failed: %s; exit code: %d", exitCode)
-		end
+		if exitCode ~= 0 then logger.ef("Execution failed: %s; exit code: %d", exitCode) end
 		if timeoutTimer then
 			logger.d("Stopping timeout timer")
 			timeoutTimer:stop()
@@ -64,8 +58,12 @@ function obj:_executeAsyncCmd(cmd, args)
 	task:closeInput()
 	timeoutTimer = hs.timer.doAfter(self.taskTimeout, function()
 		if task and task:isRunning() then
-			logger.wf("Terminating task %s (PID: %d) after %f seconds", hs.inspect(task), task:pid() or -1,
-				self.taskTimeout)
+			logger.wf(
+				"Terminating task %s (PID: %d) after %f seconds",
+				hs.inspect(task),
+				task:pid() or -1,
+				self.taskTimeout
+			)
 			task:terminate()
 		end
 	end)
@@ -113,9 +111,7 @@ function obj:_cancelAllTimers()
 	self._timers = {}
 end
 
-local function hasElements(t)
-	return t and #t > 0
-end
+local function hasElements(t) return t and #t > 0 end
 
 function obj:_executeCmd(item, extraArgs)
 	local args
@@ -139,16 +135,12 @@ function obj:_cmdAdd(hookType, cmd, delay)
 	return self
 end
 
-function obj:whenResume(cmd, delay)
-	return self:_cmdAdd(RESUME, cmd, delay)
-end
+function obj:whenResume(cmd, delay) return self:_cmdAdd(RESUME, cmd, delay) end
 
-function obj:whenSuspend(cmd, delay)
-	return self:_cmdAdd(SUSPEND, cmd, delay)
-end
+function obj:whenSuspend(cmd, delay) return self:_cmdAdd(SUSPEND, cmd, delay) end
 
-function obj:onWifiChange(cmd, delay)
-	return self:_cmdAdd(WIFI, cmd, delay)
+function obj:onWifiChange(cmd, delay) return self:_cmdAdd(WIFI, cmd, delay) end
+
 local function tablesEqual(t1, t2)
 	if t1 == t2 then return true end
 	if type(t1) ~= "table" or type(t2) ~= "table" then return false end
@@ -170,8 +162,13 @@ function obj:_execHooks(hookType, args)
 	if hookType == self.lastHook and tablesEqual(args, self.lastArgs) then
 		local last = currentTime - self.lastHookTime
 		if last < self.cooldown then
-			logger.df("Hooks for %s skipped due to cooldown: last run %f seconds ago < %f", hookType, last,
-				self.cooldown)
+			logger.df(
+				"Hooks for %s with args %s skipped due to cooldown: last run %f seconds ago < %f",
+				hookType,
+				hs.inspect(args),
+				last,
+				self.cooldown
+			)
 			return
 		end
 	else
@@ -181,34 +178,30 @@ function obj:_execHooks(hookType, args)
 	end
 	self.lastHookTime = currentTime
 	logger.df("Executing hooks from %s", hookType)
-	hs.fnutils.each(self.hooks[hookType], function(item)
-		self:_executeCmd(item, args)
-	end)
+	hs.fnutils.each(self.hooks[hookType], function(item) self:_executeCmd(item, args) end)
 end
 
 function obj:_caffeinateWatcherCallback(event)
 	if
-	    event == hs.caffeinate.watcher.screensaverDidStop
-	    or event == hs.caffeinate.watcher.screensaverWillStop
-	    or event == hs.caffeinate.watcher.screensDidUnlock
-	    or event == hs.caffeinate.watcher.screensDidWake
-	    or event == hs.caffeinate.watcher.sessionDidBecomeActive
+		event == hs.caffeinate.watcher.screensaverDidStop
+		or event == hs.caffeinate.watcher.screensaverWillStop
+		or event == hs.caffeinate.watcher.screensDidUnlock
+		or event == hs.caffeinate.watcher.screensDidWake
+		or event == hs.caffeinate.watcher.sessionDidBecomeActive
 	then
 		logger.i("Executing resume hooks")
 		self:_execHooks(RESUME)
 	elseif
-	    event == hs.caffeinate.watcher.screensaverDidStart
-	    or event == hs.caffeinate.watcher.screensDidLock
-	    or event == hs.caffeinate.watcher.screensDidSleep
-	    or event == hs.caffeinate.watcher.systemWillPowerOff
-	    or event == hs.caffeinate.watcher.systemWillSleep
-	    or event == hs.caffeinate.watcher.sessionDidResignActive
+		event == hs.caffeinate.watcher.screensaverDidStart
+		or event == hs.caffeinate.watcher.screensDidLock
+		or event == hs.caffeinate.watcher.screensDidSleep
+		or event == hs.caffeinate.watcher.systemWillPowerOff
+		or event == hs.caffeinate.watcher.systemWillSleep
+		or event == hs.caffeinate.watcher.sessionDidResignActive
 	then
 		logger.i("Executing suspend hooks")
 		self:_execHooks(SUSPEND)
-	elseif
-	    event ~= hs.caffeinate.watcher.systemDidWake
-	then
+	elseif event ~= hs.caffeinate.watcher.systemDidWake then
 		logger.df("Unsupported caffeinate event '%s'", event)
 	end
 end
@@ -220,8 +213,13 @@ function obj:_ssidChangedCallback()
 end
 
 function obj:start()
-	logger.f("Starting %s (resume: %d, suspend: %d, wifi: %d hooks)",
-		self.name, #self.hooks[RESUME], #self.hooks[SUSPEND], #self.hooks[WIFI])
+	logger.f(
+		"Starting %s (resume: %d, suspend: %d, wifi: %d hooks)",
+		self.name,
+		#self.hooks[RESUME],
+		#self.hooks[SUSPEND],
+		#self.hooks[WIFI]
+	)
 	self.suspendWatcher = hs.caffeinate.watcher.new(hs.fnutils.partial(self._caffeinateWatcherCallback, self))
 	self.suspendWatcher:start()
 	self.wifiWatcher = hs.wifi.watcher.new(hs.fnutils.partial(self._ssidChangedCallback, self))
