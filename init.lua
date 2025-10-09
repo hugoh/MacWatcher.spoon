@@ -37,14 +37,16 @@ function obj:_executeAsyncCmd(cmd, args)
 	local fullCmd = cmd .. "; args: " .. hs.inspect(args)
 	logger.i("Executing command: " .. fullCmd)
 	local timeoutTimer
-	local task = hs.task.new(cmd, function(exitCode, _, _)
+	local task = hs.task.new(cmd, function(exitCode, stdOut, stdErr)
 		-- FIXME: Getting errors:
 		-- ** Warning:   LuaSkin: hs.task terminationHandler block encountered an exception:
 		--		 *** -[NSConcreteFileHandle readDataOfLength:]: Resource temporarily unavailable
 		--  Related https://github.com/Hammerspoon/hammerspoon/issues/3210
 		exitCode = exitCode or -1
-		logger.df("Exit code: %d", exitCode or -1)
-		if exitCode ~= 0 then logger.ef("Execution failed: %s; exit code: %d", exitCode) end
+		logger.df("Exit code: %d", exitCode)
+		if exitCode ~= 0 then
+			logger.ef("Execution failed: %s; exit code: %d\nstdOut: %s\nstdErr:%s", fullCmd, exitCode, stdOut, stdErr)
+		end
 		if timeoutTimer then
 			logger.d("Stopping timeout timer")
 			timeoutTimer:stop()
