@@ -95,8 +95,8 @@ describe("MacWatcher Spoon", function()
 	it("_caffeinateWatcherCallback maps events to resume/suspend", function()
 		overrideExecute(w)
 
-		w:whenResume({ "r" }, 0)
-		w:whenSuspend({ "s" }, 0)
+		w:whenResume({ "r" }) -- no delay parameter
+		w:whenSuspend({ "s" }, 0) -- parameter = 0
 
 		w:_caffeinateWatcherCallback(hs.caffeinate.watcher.screensaverDidStop)
 		w:_caffeinateWatcherCallback(hs.caffeinate.watcher.screensaverDidStart)

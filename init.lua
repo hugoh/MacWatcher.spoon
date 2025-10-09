@@ -128,6 +128,7 @@ function obj:_executeCmd(item, extraArgs)
 end
 
 function obj:_cmdAdd(hookType, cmd, delay)
+	if delay == nil then delay = 0 end
 	logger.df("Adding to %s: %s; delay: %d", hookType, hs.inspect(cmd), delay)
 	local realCmd = cmd[1]
 	table.remove(cmd, 1)
