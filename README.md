@@ -17,6 +17,7 @@ A Hammerspoon Spoon that executes commands on system events like wake, sleep, an
 
 1. Ensure you have [Hammerspoon](https://www.hammerspoon.org) installed
 2. Clone this repository to your Spoons directory:
+
 ```bash
 cd ~/.hammerspoon/Spoons
 git clone https://github.com/yourusername/MacWatcher.spoon.git
@@ -37,7 +38,7 @@ macWatcher
   :whenResume({"/bin/echo", "System resumed"}, 2)  -- Run 2 seconds after a session is resumed
   :whenSuspend({"/usr/bin/true"}, 0)               -- Run immediately before sleep
   :onWifiChange({"/usr/local/bin/ssid_handler"}, 1) -- Run 1s after WiFi change (note: SSID passed as an argument to the command)
-  
+
 -- Start monitoring
 macWatcher:start()
 ```

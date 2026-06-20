@@ -109,14 +109,15 @@ describe("MacWatcher Spoon", function()
 	it("_executeAfter cancels prior timer for same key", function()
 		overrideExecute(w)
 
-		-- Schedule with delay
+		-- Schedule with delay (no hookType → key is ":echo")
 		w:_executeAfter("echo", { "a" }, 5)
-		local t1 = w._timers["echo"]
+		local key = ":echo"
+		local t1 = w._timers[key]
 		assert.is_true(t1 ~= nil)
 
 		-- Re-schedule; should cancel t1
 		w:_executeAfter("echo", { "b" }, 5)
-		local t2 = w._timers["echo"]
+		local t2 = w._timers[key]
 		assert.is_true(t2 ~= nil and t2 ~= t1)
 		assert.is_true(t1._stopped == true)
 

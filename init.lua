@@ -17,10 +17,9 @@ obj.hooks[RESUME] = {}
 obj.hooks[SUSPEND] = {}
 obj.hooks[WIFI] = {}
 obj._timers = {}
+obj._timerSeq = 0
 obj.cooldown = 5
-obj.lastArgs = nil
-obj.lastHook = nil
-obj.lastHookTime = 0
+obj._cooldownState = {}
 obj.taskTimeout = 30
 
 local logger = hs.logger.new(obj.name, "info")
@@ -36,6 +35,8 @@ end
 function obj:_executeAsyncCmd(cmd, args)
 	local fullCmd = cmd .. "; args: " .. hs.inspect(args)
 	logger.i("Executing command: " .. fullCmd)
+	self._timerSeq = self._timerSeq + 1
+	local timeoutKey = "__timeout_" .. self._timerSeq
 	local timeoutTimer
 	local task = hs.task.new(cmd, function(exitCode, stdOut, stdErr)
 		-- FIXME: Getting errors:
@@ -49,6 +50,7 @@ function obj:_executeAsyncCmd(cmd, args)
 		end
 		if timeoutTimer then
 			logger.d("Stopping timeout timer")
+			self._timers[timeoutKey] = nil
 			timeoutTimer:stop()
 			timeoutTimer = nil
 		end
@@ -59,6 +61,7 @@ function obj:_executeAsyncCmd(cmd, args)
 	end, args)
 	task:closeInput()
 	timeoutTimer = hs.timer.doAfter(self.taskTimeout, function()
+		self._timers[timeoutKey] = nil
 		if task and task:isRunning() then
 			logger.wf(
 				"Terminating task %s (PID: %d) after %f seconds",
@@ -69,6 +72,7 @@ function obj:_executeAsyncCmd(cmd, args)
 			task:terminate()
 		end
 	end)
+	self._timers[timeoutKey] = timeoutTimer
 	task:start()
 end
 
@@ -85,10 +89,10 @@ function obj:_execute(cmd, args)
 	end
 end
 
-function obj:_executeAfter(cmd, args, delay)
-	local timerKey = tostring(cmd)
+function obj:_executeAfter(cmd, args, delay, hookType)
+	local timerKey = (hookType or "") .. ":" .. tostring(cmd)
 	if self._timers[timerKey] then
-		logger.d("Canceling existing timer for key: %s", timerKey)
+		logger.df("Canceling existing timer for key: %s", timerKey)
 		self._timers[timerKey]:stop()
 		self._timers[timerKey] = nil
 	end
@@ -107,7 +111,7 @@ end
 
 function obj:_cancelAllTimers()
 	for key, timer in pairs(self._timers) do
-		logger.d("Canceling timer for key: %s", key)
+		logger.df("Canceling timer for key: %s", key)
 		timer:stop()
 	end
 	self._timers = {}
@@ -115,7 +119,7 @@ end
 
 local function hasElements(t) return t and #t > 0 end
 
-function obj:_executeCmd(item, extraArgs)
+function obj:_executeCmd(item, extraArgs, hookType)
 	local args
 	if hasElements(item.args) then
 		if hasElements(extraArgs) then
@@ -126,15 +130,15 @@ function obj:_executeCmd(item, extraArgs)
 	else
 		args = extraArgs
 	end
-	self:_executeAfter(item.cmd, args, item.delay)
+	self:_executeAfter(item.cmd, args, item.delay, hookType)
 end
 
 function obj:_cmdAdd(hookType, cmd, delay)
 	if delay == nil then delay = 0 end
 	logger.df("Adding to %s: %s; delay: %d", hookType, hs.inspect(cmd), delay)
 	local realCmd = cmd[1]
-	table.remove(cmd, 1)
-	table.insert(self.hooks[hookType], { cmd = realCmd, args = cmd, delay = delay })
+	local cmdArgs = { table.unpack(cmd, 2) }
+	table.insert(self.hooks[hookType], { cmd = realCmd, args = cmdArgs, delay = delay })
 	return self
 end
 
@@ -162,8 +166,9 @@ end
 
 function obj:_execHooks(hookType, args)
 	local currentTime = hs.timer.secondsSinceEpoch()
-	if hookType == self.lastHook and tablesEqual(args, self.lastArgs) then
-		local last = currentTime - self.lastHookTime
+	local state = self._cooldownState[hookType]
+	if state and tablesEqual(args, state.args) then
+		local last = currentTime - state.time
 		if last < self.cooldown then
 			logger.df(
 				"Hooks for %s with args %s skipped due to cooldown: last run %f seconds ago < %f",
@@ -176,12 +181,10 @@ function obj:_execHooks(hookType, args)
 		end
 	else
 		logger.df("Resetting hooks cooldown for %s with args %s", hookType, hs.inspect(args))
-		self.lastHook = hookType
-		self.lastArgs = args
 	end
-	self.lastHookTime = currentTime
+	self._cooldownState[hookType] = { args = args, time = currentTime }
 	logger.df("Executing hooks from %s", hookType)
-	hs.fnutils.each(self.hooks[hookType], function(item) self:_executeCmd(item, args) end)
+	hs.fnutils.each(self.hooks[hookType], function(item) self:_executeCmd(item, args, hookType) end)
 end
 
 function obj:_caffeinateWatcherCallback(event)
@@ -242,7 +245,7 @@ function obj:stop()
 		self.wifiWatcher:stop()
 		self.wifiWatcher = nil
 	end
-	self:_execHooks(self.suspend)
+	self:_execHooks(SUSPEND)
 end
 
 return obj
