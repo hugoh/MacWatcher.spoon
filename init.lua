@@ -89,8 +89,8 @@ function obj:_execute(cmd, args)
 	end
 end
 
-function obj:_executeAfter(cmd, args, delay)
-	local timerKey = tostring(cmd)
+function obj:_executeAfter(cmd, args, delay, hookType)
+	local timerKey = (hookType or "") .. ":" .. tostring(cmd)
 	if self._timers[timerKey] then
 		logger.df("Canceling existing timer for key: %s", timerKey)
 		self._timers[timerKey]:stop()
@@ -119,7 +119,7 @@ end
 
 local function hasElements(t) return t and #t > 0 end
 
-function obj:_executeCmd(item, extraArgs)
+function obj:_executeCmd(item, extraArgs, hookType)
 	local args
 	if hasElements(item.args) then
 		if hasElements(extraArgs) then
@@ -130,7 +130,7 @@ function obj:_executeCmd(item, extraArgs)
 	else
 		args = extraArgs
 	end
-	self:_executeAfter(item.cmd, args, item.delay)
+	self:_executeAfter(item.cmd, args, item.delay, hookType)
 end
 
 function obj:_cmdAdd(hookType, cmd, delay)
@@ -184,7 +184,7 @@ function obj:_execHooks(hookType, args)
 	end
 	self._cooldownState[hookType] = { args = args, time = currentTime }
 	logger.df("Executing hooks from %s", hookType)
-	hs.fnutils.each(self.hooks[hookType], function(item) self:_executeCmd(item, args) end)
+	hs.fnutils.each(self.hooks[hookType], function(item) self:_executeCmd(item, args, hookType) end)
 end
 
 function obj:_caffeinateWatcherCallback(event)
