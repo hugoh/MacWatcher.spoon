@@ -92,7 +92,7 @@ end
 function obj:_executeAfter(cmd, args, delay)
 	local timerKey = tostring(cmd)
 	if self._timers[timerKey] then
-		logger.d("Canceling existing timer for key: %s", timerKey)
+		logger.df("Canceling existing timer for key: %s", timerKey)
 		self._timers[timerKey]:stop()
 		self._timers[timerKey] = nil
 	end
@@ -111,7 +111,7 @@ end
 
 function obj:_cancelAllTimers()
 	for key, timer in pairs(self._timers) do
-		logger.d("Canceling timer for key: %s", key)
+		logger.df("Canceling timer for key: %s", key)
 		timer:stop()
 	end
 	self._timers = {}
