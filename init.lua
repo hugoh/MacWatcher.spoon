@@ -17,6 +17,7 @@ obj.hooks[RESUME] = {}
 obj.hooks[SUSPEND] = {}
 obj.hooks[WIFI] = {}
 obj._timers = {}
+obj._timerSeq = 0
 obj.cooldown = 5
 obj.lastArgs = nil
 obj.lastHook = nil
@@ -36,6 +37,8 @@ end
 function obj:_executeAsyncCmd(cmd, args)
 	local fullCmd = cmd .. "; args: " .. hs.inspect(args)
 	logger.i("Executing command: " .. fullCmd)
+	self._timerSeq = self._timerSeq + 1
+	local timeoutKey = "__timeout_" .. self._timerSeq
 	local timeoutTimer
 	local task = hs.task.new(cmd, function(exitCode, stdOut, stdErr)
 		-- FIXME: Getting errors:
@@ -49,6 +52,7 @@ function obj:_executeAsyncCmd(cmd, args)
 		end
 		if timeoutTimer then
 			logger.d("Stopping timeout timer")
+			self._timers[timeoutKey] = nil
 			timeoutTimer:stop()
 			timeoutTimer = nil
 		end
@@ -59,6 +63,7 @@ function obj:_executeAsyncCmd(cmd, args)
 	end, args)
 	task:closeInput()
 	timeoutTimer = hs.timer.doAfter(self.taskTimeout, function()
+		self._timers[timeoutKey] = nil
 		if task and task:isRunning() then
 			logger.wf(
 				"Terminating task %s (PID: %d) after %f seconds",
@@ -69,6 +74,7 @@ function obj:_executeAsyncCmd(cmd, args)
 			task:terminate()
 		end
 	end)
+	self._timers[timeoutKey] = timeoutTimer
 	task:start()
 end
 
