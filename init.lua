@@ -19,9 +19,7 @@ obj.hooks[WIFI] = {}
 obj._timers = {}
 obj._timerSeq = 0
 obj.cooldown = 5
-obj.lastArgs = nil
-obj.lastHook = nil
-obj.lastHookTime = 0
+obj._cooldownState = {}
 obj.taskTimeout = 30
 
 local logger = hs.logger.new(obj.name, "info")
@@ -168,8 +166,9 @@ end
 
 function obj:_execHooks(hookType, args)
 	local currentTime = hs.timer.secondsSinceEpoch()
-	if hookType == self.lastHook and tablesEqual(args, self.lastArgs) then
-		local last = currentTime - self.lastHookTime
+	local state = self._cooldownState[hookType]
+	if state and tablesEqual(args, state.args) then
+		local last = currentTime - state.time
 		if last < self.cooldown then
 			logger.df(
 				"Hooks for %s with args %s skipped due to cooldown: last run %f seconds ago < %f",
@@ -182,10 +181,8 @@ function obj:_execHooks(hookType, args)
 		end
 	else
 		logger.df("Resetting hooks cooldown for %s with args %s", hookType, hs.inspect(args))
-		self.lastHook = hookType
-		self.lastArgs = args
 	end
-	self.lastHookTime = currentTime
+	self._cooldownState[hookType] = { args = args, time = currentTime }
 	logger.df("Executing hooks from %s", hookType)
 	hs.fnutils.each(self.hooks[hookType], function(item) self:_executeCmd(item, args) end)
 end
