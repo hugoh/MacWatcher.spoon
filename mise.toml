@@ -15,6 +15,10 @@ typos = "latest"
 # yamllint = "latest"
 zizmor = "latest"
 
+[tasks.test]
+description = "Run Lua unit tests with busted"
+run = "busted -p 'test_.*%.lua' tests"
+
 [hooks]
 postinstall = ["luarocks install busted", "luarocks install luacheck"]
 
