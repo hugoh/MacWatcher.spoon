@@ -137,8 +137,8 @@ function obj:_cmdAdd(hookType, cmd, delay)
 	if delay == nil then delay = 0 end
 	logger.df("Adding to %s: %s; delay: %d", hookType, hs.inspect(cmd), delay)
 	local realCmd = cmd[1]
-	table.remove(cmd, 1)
-	table.insert(self.hooks[hookType], { cmd = realCmd, args = cmd, delay = delay })
+	local cmdArgs = { table.unpack(cmd, 2) }
+	table.insert(self.hooks[hookType], { cmd = realCmd, args = cmdArgs, delay = delay })
 	return self
 end
 
