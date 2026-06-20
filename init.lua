@@ -242,7 +242,7 @@ function obj:stop()
 		self.wifiWatcher:stop()
 		self.wifiWatcher = nil
 	end
-	self:_execHooks(self.suspend)
+	self:_execHooks(SUSPEND)
 end
 
 return obj
