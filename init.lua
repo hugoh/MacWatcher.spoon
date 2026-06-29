@@ -177,10 +177,10 @@ local function tablesEqual(t1, t2)
 	return true
 end
 
-function obj:_execHooks(hookType, args)
+function obj:_execHooks(hookType, args, force)
 	local currentTime = hs.timer.secondsSinceEpoch()
 	local state = self._cooldownState[hookType]
-	if state and tablesEqual(args, state.args) then
+	if not force and state and tablesEqual(args, state.args) then
 		local last = currentTime - state.time
 		if last < self.cooldown then
 			logger.df(
@@ -260,7 +260,7 @@ function obj:stop()
 		self.wifiWatcher:stop()
 		self.wifiWatcher = nil
 	end
-	self:_execHooks(SUSPEND)
+	self:_execHooks(SUSPEND, nil, true)
 	for _, item in ipairs(self.hooks[STOP]) do
 		local parts = { shellQuote(item.cmd) }
 		for _, arg in ipairs(item.args) do

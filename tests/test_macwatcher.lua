@@ -196,6 +196,20 @@ describe("MacWatcher Spoon", function()
 		assert.are.equal("halt", w._executed[1].cmd)
 	end)
 
+	it("stop() fires suspend hooks even within cooldown window", function()
+		overrideExecute(w)
+		w.cooldown = 5
+		w:whenSuspend({ "halt" }, 0)
+		mock._setTime(100)
+		w:_execHooks("suspend") -- simulate a hardware suspend event
+		assert.are.equal(1, #w._executed)
+		mock._setTime(102) -- still within cooldown
+		w:start()
+		w:stop() -- must fire despite cooldown
+		assert.are.equal(2, #w._executed)
+		assert.are.equal("halt", w._executed[2].cmd)
+	end)
+
 	it("stop() cancels pending timers", function()
 		w:start()
 		w:_executeAfter("pending", {}, 10)
