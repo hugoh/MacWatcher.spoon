@@ -102,8 +102,8 @@ describe("MacWatcher Spoon", function()
 		w:_caffeinateWatcherCallback(hs.caffeinate.watcher.screensaverDidStart)
 
 		assert.are.equal(2, #w._executed)
-		assert.is_nil(w._executed[1].args) -- no extra args for resume
-		assert.is_nil(w._executed[2].args) -- no extra args for suspend
+		assert.are.same({}, w._executed[1].args) -- no extra args for resume
+		assert.are.same({}, w._executed[2].args) -- no extra args for suspend
 	end)
 
 	it("_executeAfter cancels prior timer for same key", function()

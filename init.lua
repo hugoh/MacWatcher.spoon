@@ -134,7 +134,7 @@ function obj:_executeCmd(item, extraArgs, hookType)
 			args = item.args
 		end
 	else
-		args = extraArgs
+		args = extraArgs or {}
 	end
 	self:_executeAfter(item.cmd, args, item.delay, hookType)
 end
