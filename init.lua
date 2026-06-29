@@ -27,9 +27,7 @@ obj.taskTimeout = 30
 
 local logger = hs.logger.new(obj.name, "info")
 
-local function shellQuote(s)
-	return "'" .. s:gsub("'", "'\\''") .. "'"
-end
+local function shellQuote(s) return "'" .. s:gsub("'", "'\\''") .. "'" end
 
 local function debugOut(label, data)
 	if logger.level < 4 then return end

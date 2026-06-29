@@ -165,7 +165,9 @@ describe("MacWatcher Spoon", function()
 		w:_executeAfter("a", {}, 5)
 		w:_executeAfter("b", {}, 5)
 		local timers = {}
-		for _, t in pairs(w._timers) do table.insert(timers, t) end
+		for _, t in pairs(w._timers) do
+			table.insert(timers, t)
+		end
 		assert.are.equal(2, #timers)
 
 		w:_cancelAllTimers()
@@ -214,7 +216,9 @@ describe("MacWatcher Spoon", function()
 		w:start()
 		w:_executeAfter("pending", {}, 10)
 		local timers = {}
-		for _, t in pairs(w._timers) do table.insert(timers, t) end
+		for _, t in pairs(w._timers) do
+			table.insert(timers, t)
+		end
 		assert.is_true(#timers > 0)
 		w:stop()
 		assert.are.equal(0, #w._timers)
