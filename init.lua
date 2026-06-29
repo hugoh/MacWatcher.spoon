@@ -19,6 +19,7 @@ obj.hooks[SUSPEND] = {}
 obj.hooks[WIFI] = {}
 obj.hooks[STOP] = {}
 obj._timers = {}
+obj._watchdogTimers = {}
 obj._timerSeq = 0
 obj.cooldown = 5
 obj._cooldownState = {}
@@ -56,7 +57,7 @@ function obj:_executeAsyncCmd(cmd, args)
 		end
 		if timeoutTimer then
 			logger.d("Stopping timeout timer")
-			self._timers[timeoutKey] = nil
+			self._watchdogTimers[timeoutKey] = nil
 			timeoutTimer:stop()
 			timeoutTimer = nil
 		end
@@ -67,7 +68,7 @@ function obj:_executeAsyncCmd(cmd, args)
 	end, args)
 	task:closeInput()
 	timeoutTimer = hs.timer.doAfter(self.taskTimeout, function()
-		self._timers[timeoutKey] = nil
+		self._watchdogTimers[timeoutKey] = nil
 		if task and task:isRunning() then
 			logger.wf(
 				"Terminating task %s (PID: %d) after %f seconds",
@@ -78,7 +79,7 @@ function obj:_executeAsyncCmd(cmd, args)
 			task:terminate()
 		end
 	end)
-	self._timers[timeoutKey] = timeoutTimer
+	self._watchdogTimers[timeoutKey] = timeoutTimer
 	task:start()
 end
 
@@ -121,6 +122,11 @@ function obj:_cancelAllTimers()
 		timer:stop()
 	end
 	self._timers = {}
+	for key, timer in pairs(self._watchdogTimers) do
+		logger.df("Canceling watchdog timer for key: %s", key)
+		timer:stop()
+	end
+	self._watchdogTimers = {}
 end
 
 local function hasElements(t) return t and #t > 0 end
