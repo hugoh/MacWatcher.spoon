@@ -26,6 +26,10 @@ obj.taskTimeout = 30
 
 local logger = hs.logger.new(obj.name, "info")
 
+local function shellQuote(s)
+	return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+
 local function debugOut(label, data)
 	if logger.level < 4 then return end
 	if not data or data == "" then return end
@@ -258,10 +262,11 @@ function obj:stop()
 	end
 	self:_execHooks(SUSPEND)
 	for _, item in ipairs(self.hooks[STOP]) do
-		local fullCmd = item.cmd
-		if #item.args > 0 then
-			fullCmd = fullCmd .. " " .. table.concat(item.args, " ")
+		local parts = { shellQuote(item.cmd) }
+		for _, arg in ipairs(item.args) do
+			table.insert(parts, shellQuote(arg))
 		end
+		local fullCmd = table.concat(parts, " ")
 		logger.i("Executing stop command: " .. fullCmd)
 		hs.execute(fullCmd, true)
 	end
