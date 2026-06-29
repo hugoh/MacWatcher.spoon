@@ -9,6 +9,7 @@ obj.name = "MacWatcher"
 local RESUME = "resume"
 local SUSPEND = "suspend"
 local WIFI = "wifi"
+local STOP = "stop"
 
 obj.suspendWatcher = nil
 obj.wifiWatcher = nil
@@ -16,6 +17,7 @@ obj.hooks = {}
 obj.hooks[RESUME] = {}
 obj.hooks[SUSPEND] = {}
 obj.hooks[WIFI] = {}
+obj.hooks[STOP] = {}
 obj._timers = {}
 obj._timerSeq = 0
 obj.cooldown = 5
@@ -148,6 +150,13 @@ function obj:whenSuspend(cmd, delay) return self:_cmdAdd(SUSPEND, cmd, delay) en
 
 function obj:onWifiChange(cmd, delay) return self:_cmdAdd(WIFI, cmd, delay) end
 
+function obj:whenStop(cmd)
+	local realCmd = cmd[1]
+	local cmdArgs = { table.unpack(cmd, 2) }
+	table.insert(self.hooks[STOP], { cmd = realCmd, args = cmdArgs })
+	return self
+end
+
 local function tablesEqual(t1, t2)
 	if t1 == t2 then return true end
 	if type(t1) ~= "table" or type(t2) ~= "table" then return false end
@@ -246,6 +255,14 @@ function obj:stop()
 		self.wifiWatcher = nil
 	end
 	self:_execHooks(SUSPEND)
+	for _, item in ipairs(self.hooks[STOP]) do
+		local fullCmd = item.cmd
+		if #item.args > 0 then
+			fullCmd = fullCmd .. " " .. table.concat(item.args, " ")
+		end
+		logger.i("Executing stop command: " .. fullCmd)
+		hs.execute(fullCmd, true)
+	end
 end
 
 return obj

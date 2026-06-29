@@ -82,6 +82,9 @@ function M.setup()
 	M._timers = timers
 
 	-- Task
+	local taskExitCode = 0
+	function M._setTaskExitCode(code) taskExitCode = code end
+
 	hs.task = {}
 	function hs.task.new(_cmd, completionFn, streamFn, _args)
 		local running = false
@@ -89,9 +92,8 @@ function M.setup()
 		local task = {}
 		function task.start(_)
 			running = true
-			-- Simulate some output callbacks then completion
 			if streamFn then streamFn(nil, "", "") end
-			if completionFn then completionFn(0, "", "") end
+			if completionFn then completionFn(taskExitCode, "", "") end
 			running = false
 			return true
 		end
@@ -137,6 +139,14 @@ function M.setup()
 		function o:stop() self._started = false end
 		return o
 	end
+
+	-- execute (blocking shell command)
+	local executed = {}
+	function hs.execute(cmd, _blocking)
+		table.insert(executed, cmd)
+		return "", true, "exit", 0
+	end
+	M._executed = executed
 
 	-- Expose mock to tests
 	M.hs = hs
