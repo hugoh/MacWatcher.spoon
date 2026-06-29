@@ -235,8 +235,10 @@ function obj:start()
 		#self.hooks[SUSPEND],
 		#self.hooks[WIFI]
 	)
+	if self.suspendWatcher then self.suspendWatcher:stop() end
 	self.suspendWatcher = hs.caffeinate.watcher.new(hs.fnutils.partial(self._caffeinateWatcherCallback, self))
 	self.suspendWatcher:start()
+	if self.wifiWatcher then self.wifiWatcher:stop() end
 	self.wifiWatcher = hs.wifi.watcher.new(hs.fnutils.partial(self._ssidChangedCallback, self))
 	self.wifiWatcher:start()
 	self:_execHooks(RESUME)
