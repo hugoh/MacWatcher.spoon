@@ -261,6 +261,7 @@ function obj:stop()
 		self.wifiWatcher = nil
 	end
 	self:_execHooks(SUSPEND, nil, true)
+	self:_cancelAllTimers()
 	for _, item in ipairs(self.hooks[STOP]) do
 		local parts = { shellQuote(item.cmd) }
 		for _, arg in ipairs(item.args) do

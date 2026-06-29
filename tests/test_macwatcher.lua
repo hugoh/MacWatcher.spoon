@@ -220,6 +220,15 @@ describe("MacWatcher Spoon", function()
 		assert.are.equal(0, #w._timers)
 	end)
 
+	it("stop() cancels any timers created by delayed suspend hooks", function()
+		overrideExecute(w)
+		w:whenSuspend({ "delayed-cleanup" }, 10) -- delay > 0: would normally create a timer
+		w:start()
+		w:stop()
+		-- timer created by _execHooks(SUSPEND) inside stop() must be cancelled before stop() returns
+		assert.are.equal(0, #w._timers)
+	end)
+
 	it("_ssidChangedCallback passes empty string when SSID is nil", function()
 		overrideExecute(w)
 		mock._setSSID(nil)
