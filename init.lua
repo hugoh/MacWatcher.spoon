@@ -154,12 +154,7 @@ function obj:whenSuspend(cmd, delay) return self:_cmdAdd(SUSPEND, cmd, delay) en
 
 function obj:onWifiChange(cmd, delay) return self:_cmdAdd(WIFI, cmd, delay) end
 
-function obj:whenStop(cmd)
-	local realCmd = cmd[1]
-	local cmdArgs = { table.unpack(cmd, 2) }
-	table.insert(self.hooks[STOP], { cmd = realCmd, args = cmdArgs })
-	return self
-end
+function obj:whenStop(cmd) return self:_cmdAdd(STOP, cmd) end
 
 local function tablesEqual(t1, t2)
 	if t1 == t2 then return true end
