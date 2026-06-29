@@ -348,13 +348,6 @@ describe("MacWatcher Spoon", function()
 		assert.are.equal(4, #w._executed)
 	end)
 
-	it("_execute logs error for invalid cmd type", function()
-		overrideExecute(w) -- still override to avoid real execution paths
-		-- This should not throw
-		w:_execute({}, nil)
-		assert.is_true(true)
-	end)
-
 	it("whenStop registers a hook", function()
 		w:whenStop({ "work-focus", "stop" })
 		assert.are.equal(1, #w.hooks["stop"])

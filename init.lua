@@ -85,15 +85,10 @@ end
 
 function obj:_execute(cmd, args)
 	if not cmd then
-		logger.e("No command or function provided")
+		logger.e("No command provided")
 		return
 	end
-
-	if type(cmd) == "string" then
-		self:_executeAsyncCmd(cmd, args)
-	else
-		logger.ef("Invalid cmd type: %s", type(cmd))
-	end
+	self:_executeAsyncCmd(cmd, args)
 end
 
 function obj:_executeAfter(cmd, args, delay, hookType)
