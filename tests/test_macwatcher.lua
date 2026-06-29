@@ -305,7 +305,6 @@ describe("MacWatcher Spoon", function()
 	it("_executeAsyncCmd logs error on non-zero exit code", function()
 		mock._setTaskExitCode(1)
 		w:_executeAsyncCmd("fail-cmd", {})
-		local logger = hs.logger.new("test")
 		-- error is logged; spoon should not throw
 		assert.is_true(true)
 	end)
