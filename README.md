@@ -7,7 +7,7 @@ A Hammerspoon Spoon that executes commands on system events like wake, sleep, an
 
 ## Features
 
-- Execute commands/callbacks when resuming from sleep/unlock
+- Execute commands when resuming from sleep/unlock
 - Trigger actions when system goes to sleep/locks
 - Monitor WiFi network changes
 - Configurable execution delays and cooldown periods
@@ -51,9 +51,10 @@ macWatcher.taskTimeout = 30      -- Timeout for command execution
 
 -- Set up event hooks
 macWatcher
-  :whenResume({"/bin/echo", "System resumed"}, 2)  -- Run 2 seconds after a session is resumed
-  :whenSuspend({"/usr/bin/true"}, 0)               -- Run immediately before sleep
-  :onWifiChange({"/usr/local/bin/ssid_handler"}, 1) -- Run 1s after WiFi change (note: SSID passed as an argument to the command)
+  :whenResume({"/bin/echo", "System resumed"}, 2)   -- Run 2 seconds after a session is resumed
+  :whenSuspend({"/usr/bin/true"}, 0)                -- Run immediately before sleep
+  :onWifiChange({"/usr/local/bin/ssid_handler"}, 1) -- Run 1s after WiFi change (SSID appended as argument)
+  :whenStop({"/usr/local/bin/teardown"})            -- Run synchronously when stop() is called
 
 -- Start monitoring
 macWatcher:start()
@@ -61,8 +62,9 @@ macWatcher:start()
 
 ## Methods
 
-- `whenResume({ command, ... }, delay)` - Run command array after wake/unlock
-- `whenSuspend({ command, ... }, delay)` - Run command array before sleep/lock
-- `onWifiChange({ command, ... }, delay)` - Run command array when WiFi network changes (SSID passed as an additional argument)
-- `start()` - Begin monitoring system events
-- `stop()` - Stop all monitoring and timers
+- `whenResume({ command, ... }, delay)` - Run command after wake/unlock, optionally after `delay` seconds
+- `whenSuspend({ command, ... }, delay)` - Run command before sleep/lock, optionally after `delay` seconds
+- `onWifiChange({ command, ... }, delay)` - Run command when WiFi network changes; current SSID is appended as an extra argument
+- `whenStop({ command, ... })` - Run command synchronously when `stop()` is called (useful for teardown scripts that must complete before the process exits)
+- `start()` - Begin monitoring system events; also fires resume hooks and the current WiFi hook immediately
+- `stop()` - Stop all monitoring, cancel pending timers, fire suspend hooks, then run any `whenStop` commands
