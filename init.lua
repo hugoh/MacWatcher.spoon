@@ -299,11 +299,24 @@ function obj:start()
 		#self.hooks[WIFI]
 	)
 	if self.suspendWatcher then self.suspendWatcher:stop() end
-	self.suspendWatcher = hs.caffeinate.watcher.new(hs.fnutils.partial(self._caffeinateWatcherCallback, self))
-	self.suspendWatcher:start()
+	local suspendOk, suspendWatcherOrErr =
+		pcall(hs.caffeinate.watcher.new, hs.fnutils.partial(self._caffeinateWatcherCallback, self))
+	if suspendOk then
+		self.suspendWatcher = suspendWatcherOrErr
+		self.suspendWatcher:start()
+	else
+		logger.w("Failed to create caffeinate watcher: " .. tostring(suspendWatcherOrErr))
+		self.suspendWatcher = nil
+	end
 	if self.wifiWatcher then self.wifiWatcher:stop() end
-	self.wifiWatcher = hs.wifi.watcher.new(hs.fnutils.partial(self._ssidChangedCallback, self))
-	self.wifiWatcher:start()
+	local wifiOk, wifiWatcherOrErr = pcall(hs.wifi.watcher.new, hs.fnutils.partial(self._ssidChangedCallback, self))
+	if wifiOk then
+		self.wifiWatcher = wifiWatcherOrErr
+		self.wifiWatcher:start()
+	else
+		logger.w("Failed to create wifi watcher: " .. tostring(wifiWatcherOrErr))
+		self.wifiWatcher = nil
+	end
 	self:_execHooks(RESUME)
 	self:_ssidChangedCallback()
 end
@@ -335,7 +348,8 @@ function obj:stop()
 		end
 		local fullCmd = table.concat(parts, " ")
 		logger.i("Executing stop command: " .. fullCmd)
-		hs.execute(fullCmd, true)
+		local execOk, execErr = pcall(hs.execute, fullCmd, true)
+		if not execOk then logger.w("Failed to execute stop command '" .. fullCmd .. "': " .. tostring(execErr)) end
 	end
 end
 
