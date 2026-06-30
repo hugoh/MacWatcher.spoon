@@ -66,9 +66,9 @@ function obj:_executeAsyncCmd(cmd, args)
 		if exitCode ~= 0 then
 			logger.ef("Execution failed: %s; exit code: %d\nstdOut: %s\nstdErr:%s", fullCmd, exitCode, stdOut, stdErr)
 		end
+		self._watchdogTimers[timeoutKey] = nil
 		if timeoutTimer then
 			logger.d("Stopping timeout timer")
-			self._watchdogTimers[timeoutKey] = nil
 			timeoutTimer:stop()
 			timeoutTimer = nil
 		end
@@ -77,7 +77,8 @@ function obj:_executeAsyncCmd(cmd, args)
 		debugOut("Error Output", stdErr)
 		return true
 	end, args)
-	task:closeInput()
+	local closeOk = pcall(function() task:closeInput() end)
+	if not closeOk then logger.w("Failed to close task input") end
 	timeoutTimer = hs.timer.doAfter(self.taskTimeout, function()
 		self._watchdogTimers[timeoutKey] = nil
 		if task and task:isRunning() then
@@ -90,8 +91,14 @@ function obj:_executeAsyncCmd(cmd, args)
 			task:terminate()
 		end
 	end)
+	-- Register the watchdog timer before starting the task: hs.task's
+	-- completion callback can fire synchronously from task:start() (e.g.
+	-- in tests), so self._watchdogTimers must already contain the entry,
+	-- and cleanup must not depend on the timeoutTimer upvalue having been
+	-- assigned, to be reliably stopped/removed.
 	self._watchdogTimers[timeoutKey] = timeoutTimer
-	task:start()
+	local startOk = pcall(function() task:start() end)
+	if not startOk then logger.w("Failed to start task") end
 end
 
 function obj:_execute(cmd, args)

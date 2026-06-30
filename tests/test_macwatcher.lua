@@ -296,9 +296,9 @@ describe("MacWatcher Spoon", function()
 
 	it("_executeAsyncCmd clears timeout timer on successful completion", function()
 		w:_executeAsyncCmd("echo", { "hi" })
-		-- mock task completes synchronously; timeout timer should be stopped
-		for key, _ in pairs(w._timers) do
-			assert.is_false(key:sub(1, 9) == "__timeout", "timeout timer still present: " .. key)
+		-- mock task completes synchronously; watchdog timer should be cleaned up
+		for key, _ in pairs(w._watchdogTimers) do
+			assert.is_false(key:sub(1, 9) == "__timeout", "watchdog timer still present: " .. key)
 		end
 	end)
 
