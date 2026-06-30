@@ -224,12 +224,15 @@ describe("MacWatcher Spoon", function()
 		assert.are.equal(0, #w._timers)
 	end)
 
-	it("stop() cancels any timers created by delayed suspend hooks", function()
+	it("stop() runs delayed suspend hooks immediately instead of dropping them", function()
 		overrideExecute(w)
-		w:whenSuspend({ "delayed-cleanup" }, 10) -- delay > 0: would normally create a timer
+		w:whenSuspend({ "delayed-cleanup" }, 10) -- delay > 0: would normally be scheduled via a timer
 		w:start()
 		w:stop()
-		-- timer created by _execHooks(SUSPEND) inside stop() must be cancelled before stop() returns
+		-- the hook must actually execute during stop(), not just get cancelled
+		assert.are.equal(1, #w._executed)
+		assert.are.equal("delayed-cleanup", w._executed[1].cmd)
+		-- and no leftover timer should exist for it
 		assert.are.equal(0, #w._timers)
 	end)
 

@@ -109,7 +109,7 @@ function obj:_execute(cmd, args)
 	self:_executeAsyncCmd(cmd, args)
 end
 
-function obj:_executeAfter(cmd, args, delay, hookType)
+function obj:_executeAfter(cmd, args, delay, hookType, immediate)
 	local timerKey = (hookType or "") .. ":" .. tostring(cmd)
 	if self._timers[timerKey] then
 		logger.df("Canceling existing timer for key: %s", timerKey)
@@ -117,7 +117,7 @@ function obj:_executeAfter(cmd, args, delay, hookType)
 		self._timers[timerKey] = nil
 	end
 
-	if delay <= 0 then
+	if immediate or delay <= 0 then
 		self:_execute(cmd, args)
 		return
 	end
@@ -144,7 +144,7 @@ end
 
 local function hasElements(t) return t and #t > 0 end
 
-function obj:_executeCmd(item, extraArgs, hookType)
+function obj:_executeCmd(item, extraArgs, hookType, immediate)
 	local args
 	if hasElements(item.args) then
 		if hasElements(extraArgs) then
@@ -155,7 +155,7 @@ function obj:_executeCmd(item, extraArgs, hookType)
 	else
 		args = extraArgs or {}
 	end
-	self:_executeAfter(item.cmd, args, item.delay, hookType)
+	self:_executeAfter(item.cmd, args, item.delay, hookType, immediate)
 end
 
 function obj:_cmdAdd(hookType, cmd, delay)
@@ -232,7 +232,7 @@ local function tablesEqual(t1, t2)
 	return true
 end
 
-function obj:_execHooks(hookType, args, force)
+function obj:_execHooks(hookType, args, force, immediate)
 	local currentTime = hs.timer.secondsSinceEpoch()
 	local state = self._cooldownState[hookType]
 	if not force and state and tablesEqual(args, state.args) then
@@ -252,7 +252,7 @@ function obj:_execHooks(hookType, args, force)
 	end
 	self._cooldownState[hookType] = { args = args, time = currentTime }
 	logger.df("Executing hooks from %s", hookType)
-	hs.fnutils.each(self.hooks[hookType], function(item) self:_executeCmd(item, args, hookType) end)
+	hs.fnutils.each(self.hooks[hookType], function(item) self:_executeCmd(item, args, hookType, immediate) end)
 end
 
 function obj:_caffeinateWatcherCallback(event)
@@ -323,7 +323,10 @@ function obj:stop()
 		self.wifiWatcher:stop()
 		self.wifiWatcher = nil
 	end
-	self:_execHooks(SUSPEND, nil, true)
+	-- immediate=true: run delayed whenSuspend hooks synchronously rather than
+	-- scheduling them via a timer, since the _cancelAllTimers() call below
+	-- would otherwise cancel them before they ever fire.
+	self:_execHooks(SUSPEND, nil, true, true)
 	self:_cancelAllTimers()
 	for _, item in ipairs(self.hooks[STOP]) do
 		local parts = { shellQuote(item.cmd) }
