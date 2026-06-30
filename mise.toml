@@ -16,17 +16,22 @@ typos = "latest"
 # yamllint = "latest"
 zizmor = "latest"
 
+[tasks.docs]
+run = "python3 scripts/generate_docs.py"
+description = "Generate docs/docs.json and docs/index.html from docstrings"
+
 [tasks.package]
+depends = ["docs"]
 run = """
 rm -rf dist
 mkdir -p dist/MacWatcher.spoon
-cp init.lua LICENSE README.md dist/MacWatcher.spoon/
+cp init.lua LICENSE README.md docs/docs.json dist/MacWatcher.spoon/
 cd dist
 zip -r ../MacWatcher.spoon.zip MacWatcher.spoon
 cd ..
 rm -rf dist
 """
-description = "Build a self-contained MacWatcher.spoon.zip"
+description = "Build a self-contained MacWatcher.spoon.zip (includes docs.json)"
 
 [tasks.test]
 description = "Run Lua unit tests with busted"
