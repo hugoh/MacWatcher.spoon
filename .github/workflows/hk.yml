@@ -6,7 +6,7 @@ permissions: {}
 on: # yamllint disable-line rule:truthy
   push:
     branches:
-      - master
+      - main
       - renovate/**
   pull_request:
 
