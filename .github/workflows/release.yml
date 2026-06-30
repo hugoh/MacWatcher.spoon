@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: read
+
 jobs:
   release:
     name: Release
@@ -40,3 +43,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ github.ref_name }}
         run: gh release create "$TAG_NAME" MacWatcher.spoon.zip --notes-file RELEASE_NOTES.md
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/
+
+  deploy-docs:
+    name: Deploy docs to GitHub Pages
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
