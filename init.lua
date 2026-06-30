@@ -11,6 +11,7 @@ obj.__index = obj
 
 -- Metadata
 obj.name = "MacWatcher"
+obj.version = "dev"
 
 local RESUME = "resume"
 local SUSPEND = "suspend"
