@@ -199,6 +199,29 @@ describe("MacWatcher Spoon", function()
 		end
 	end)
 
+	it("stop() logs using self.name, not the module-level obj.name (multi-instance safe)", function()
+		-- Capture the logger instance created when init.lua is loaded, so we can
+		-- inspect what it logged.
+		local capturedLogger
+		local origNew = hs.logger.new
+		hs.logger.new = function(...)
+			capturedLogger = origNew(...)
+			return capturedLogger
+		end
+		local w2 = dofile("init.lua")
+		hs.logger.new = origNew
+
+		local instance = setmetatable({ name = "OtherInstance" }, { __index = w2 })
+		instance:start()
+		instance:stop()
+
+		local found = false
+		for _, entry in ipairs(capturedLogger._logs) do
+			if entry.msg == "Stopping OtherInstance" then found = true end
+		end
+		assert.is_true(found)
+	end)
+
 	it("stop() stops and nils the watchers", function()
 		w:start()
 		local sw, ww = w.suspendWatcher, w.wifiWatcher

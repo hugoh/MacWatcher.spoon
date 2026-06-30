@@ -313,7 +313,7 @@ end
 --- Stop all monitoring, cancel pending timers, fire suspend hooks synchronously,
 --- then run any whenStop commands.
 function obj:stop()
-	logger.i("Stopping " .. obj.name)
+	logger.i("Stopping " .. self.name)
 	self:_cancelAllTimers()
 	if self.suspendWatcher then
 		self.suspendWatcher:stop()
