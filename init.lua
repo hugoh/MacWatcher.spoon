@@ -1,5 +1,11 @@
 -- vim: set ft=lua:
 
+--- === MacWatcher ===
+---
+--- A Hammerspoon Spoon that runs commands on system events: wake, sleep, and WiFi changes.
+---
+--- Download: https://github.com/hugoh/MacWatcher.spoon/releases/latest
+
 local obj = {}
 obj.__index = obj
 
@@ -21,8 +27,14 @@ obj.hooks[STOP] = {}
 obj._timers = {}
 obj._watchdogTimers = {}
 obj._timerSeq = 0
+--- MacWatcher.cooldown
+--- Variable
+--- Minimum seconds between repeated hook executions for the same event (default: 5).
 obj.cooldown = 5
 obj._cooldownState = {}
+--- MacWatcher.taskTimeout
+--- Variable
+--- Maximum seconds a command may run before it is forcibly terminated (default: 30).
 obj.taskTimeout = 30
 
 local logger = hs.logger.new(obj.name, "info")
@@ -147,12 +159,53 @@ function obj:_cmdAdd(hookType, cmd, delay)
 	return self
 end
 
+--- MacWatcher:whenResume(cmd[, delay]) -> MacWatcher
+--- Method
+--- Register a command to run after the system resumes from sleep or unlocks.
+---
+--- Parameters:
+---  * cmd - A table where the first element is the executable path and remaining elements are arguments
+---  * delay - (optional) Seconds to wait before executing; default 0
+---
+--- Returns:
+---  * The MacWatcher object, for method chaining
 function obj:whenResume(cmd, delay) return self:_cmdAdd(RESUME, cmd, delay) end
 
+--- MacWatcher:whenSuspend(cmd[, delay]) -> MacWatcher
+--- Method
+--- Register a command to run before the system sleeps or locks.
+---
+--- Parameters:
+---  * cmd - A table where the first element is the executable path and remaining elements are arguments
+---  * delay - (optional) Seconds to wait before executing; default 0
+---
+--- Returns:
+---  * The MacWatcher object, for method chaining
 function obj:whenSuspend(cmd, delay) return self:_cmdAdd(SUSPEND, cmd, delay) end
 
+--- MacWatcher:onWifiChange(cmd[, delay]) -> MacWatcher
+--- Method
+--- Register a command to run when the WiFi network changes.
+--- The current SSID is appended as an extra argument to the command.
+---
+--- Parameters:
+---  * cmd - A table where the first element is the executable path and remaining elements are arguments
+---  * delay - (optional) Seconds to wait before executing; default 0
+---
+--- Returns:
+---  * The MacWatcher object, for method chaining
 function obj:onWifiChange(cmd, delay) return self:_cmdAdd(WIFI, cmd, delay) end
 
+--- MacWatcher:whenStop(cmd) -> MacWatcher
+--- Method
+--- Register a command to run synchronously when stop() is called.
+--- Useful for teardown scripts that must complete before the process exits.
+---
+--- Parameters:
+---  * cmd - A table where the first element is the executable path and remaining elements are arguments
+---
+--- Returns:
+---  * The MacWatcher object, for method chaining
 function obj:whenStop(cmd) return self:_cmdAdd(STOP, cmd) end
 
 local function tablesEqual(t1, t2)
@@ -225,6 +278,10 @@ function obj:_ssidChangedCallback()
 	self:_execHooks(WIFI, { currentSSID })
 end
 
+--- MacWatcher:start()
+--- Method
+--- Start monitoring system events.
+--- Also immediately fires resume hooks and evaluates the current WiFi state.
 function obj:start()
 	logger.f(
 		"Starting %s (resume: %d, suspend: %d, wifi: %d hooks)",
@@ -243,6 +300,10 @@ function obj:start()
 	self:_ssidChangedCallback()
 end
 
+--- MacWatcher:stop()
+--- Method
+--- Stop all monitoring, cancel pending timers, fire suspend hooks synchronously,
+--- then run any whenStop commands.
 function obj:stop()
 	logger.i("Stopping " .. obj.name)
 	self:_cancelAllTimers()
