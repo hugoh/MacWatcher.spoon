@@ -5,6 +5,7 @@ import json
 import re
 import sys
 from datetime import date
+from html import escape as h
 from pathlib import Path
 
 REPO_URL = "https://github.com/hugoh/MacWatcher.spoon"
@@ -191,7 +192,7 @@ _HTML = """\
   .item-body {{ padding: .75rem 1rem; }}
   .sig {{ font-family: monospace; font-size: .875rem; background: var(--code-bg);
           border: 1px solid var(--border); border-radius: 4px;
-          padding: .4rem .75rem; margin: .25rem 0 .75rem; white-space: pre-wrap; word-break: break-all; }}
+          padding: .4rem .75rem; margin: .25rem 0 .75rem; white-space: pre-wrap; overflow-wrap: break-word; }}
   .section-label {{ font-weight: 600; font-size: .85rem; margin: .75rem 0 .2rem; }}
   ul.params {{ margin: .25rem 0 0; padding-left: 1.25rem; }}
   ul.params li {{ margin: .15rem 0; font-size: .95rem; }}
@@ -219,7 +220,7 @@ _HTML = """\
 def _list_html(label: str, items: list[str]) -> str:
     if not items:
         return ""
-    lis = "\n".join(f"      <li>{item}</li>" for item in items)
+    lis = "\n".join(f"      <li>{h(item)}</li>" for item in items)
     return (
         f'    <p class="section-label">{label}</p>\n'
         f'    <ul class="params">\n{lis}\n    </ul>\n'
@@ -232,7 +233,7 @@ def to_html(module: dict) -> str:
         by_type.setdefault(item["type"], []).append(item)
 
     sections: list[str] = []
-    for type_name in ("Variable", "Method", "Function", "Constructor"):
+    for type_name in ("Variable", "Field", "Method", "Function", "Constructor"):
         group = by_type.get(type_name)
         if not group:
             continue
@@ -241,13 +242,13 @@ def to_html(module: dict) -> str:
             params = _list_html("Parameters", item["parameters"])
             returns = _list_html("Returns", item["returns"])
             sections.append(
-                f'<div class="item" id="{item["name"]}">\n'
+                f'<div class="item" id="{h(item["name"])}">\n'
                 f'  <div class="item-header">'
-                f'<span class="item-name">{item["name"]}</span>'
+                f'<span class="item-name">{h(item["name"])}</span>'
                 f"</div>\n"
                 f'  <div class="item-body">\n'
-                f'    <div class="sig">{item["signature"]}</div>\n'
-                f"    <p>{item['desc']}</p>\n"
+                f'    <div class="sig">{h(item["signature"])}</div>\n'
+                f"    <p>{h(item['desc'])}</p>\n"
                 f"{params}"
                 f"{returns}"
                 f"  </div>\n"
@@ -255,8 +256,8 @@ def to_html(module: dict) -> str:
             )
 
     return _HTML.format(
-        name=module["name"],
-        desc=module["desc"],
+        name=h(module["name"]),
+        desc=h(module["desc"]),
         repo_url=REPO_URL,
         today=date.today().isoformat(),
         body="\n".join(sections),
