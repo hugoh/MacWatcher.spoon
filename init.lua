@@ -66,9 +66,9 @@ function obj:_executeAsyncCmd(cmd, args)
 		if exitCode ~= 0 then
 			logger.ef("Execution failed: %s; exit code: %d\nstdOut: %s\nstdErr:%s", fullCmd, exitCode, stdOut, stdErr)
 		end
+		self._watchdogTimers[timeoutKey] = nil
 		if timeoutTimer then
 			logger.d("Stopping timeout timer")
-			self._watchdogTimers[timeoutKey] = nil
 			timeoutTimer:stop()
 			timeoutTimer = nil
 		end
@@ -77,7 +77,8 @@ function obj:_executeAsyncCmd(cmd, args)
 		debugOut("Error Output", stdErr)
 		return true
 	end, args)
-	task:closeInput()
+	local closeOk = pcall(function() task:closeInput() end)
+	if not closeOk then logger.w("Failed to close task input") end
 	timeoutTimer = hs.timer.doAfter(self.taskTimeout, function()
 		self._watchdogTimers[timeoutKey] = nil
 		if task and task:isRunning() then
@@ -90,8 +91,14 @@ function obj:_executeAsyncCmd(cmd, args)
 			task:terminate()
 		end
 	end)
+	-- Register the watchdog timer before starting the task: hs.task's
+	-- completion callback can fire synchronously from task:start() (e.g.
+	-- in tests), so self._watchdogTimers must already contain the entry,
+	-- and cleanup must not depend on the timeoutTimer upvalue having been
+	-- assigned, to be reliably stopped/removed.
 	self._watchdogTimers[timeoutKey] = timeoutTimer
-	task:start()
+	local startOk = pcall(function() task:start() end)
+	if not startOk then logger.w("Failed to start task") end
 end
 
 function obj:_execute(cmd, args)
@@ -102,15 +109,15 @@ function obj:_execute(cmd, args)
 	self:_executeAsyncCmd(cmd, args)
 end
 
-function obj:_executeAfter(cmd, args, delay, hookType)
-	local timerKey = (hookType or "") .. ":" .. tostring(cmd)
+function obj:_executeAfter(cmd, args, delay, hookType, immediate)
+	local timerKey = (hookType or "") .. ":" .. tostring(cmd) .. ":" .. hs.inspect(args)
 	if self._timers[timerKey] then
 		logger.df("Canceling existing timer for key: %s", timerKey)
 		self._timers[timerKey]:stop()
 		self._timers[timerKey] = nil
 	end
 
-	if delay <= 0 then
+	if immediate or delay <= 0 then
 		self:_execute(cmd, args)
 		return
 	end
@@ -137,7 +144,7 @@ end
 
 local function hasElements(t) return t and #t > 0 end
 
-function obj:_executeCmd(item, extraArgs, hookType)
+function obj:_executeCmd(item, extraArgs, hookType, immediate)
 	local args
 	if hasElements(item.args) then
 		if hasElements(extraArgs) then
@@ -148,7 +155,7 @@ function obj:_executeCmd(item, extraArgs, hookType)
 	else
 		args = extraArgs or {}
 	end
-	self:_executeAfter(item.cmd, args, item.delay, hookType)
+	self:_executeAfter(item.cmd, args, item.delay, hookType, immediate)
 end
 
 function obj:_cmdAdd(hookType, cmd, delay)
@@ -225,7 +232,7 @@ local function tablesEqual(t1, t2)
 	return true
 end
 
-function obj:_execHooks(hookType, args, force)
+function obj:_execHooks(hookType, args, force, immediate)
 	local currentTime = hs.timer.secondsSinceEpoch()
 	local state = self._cooldownState[hookType]
 	if not force and state and tablesEqual(args, state.args) then
@@ -245,7 +252,7 @@ function obj:_execHooks(hookType, args, force)
 	end
 	self._cooldownState[hookType] = { args = args, time = currentTime }
 	logger.df("Executing hooks from %s", hookType)
-	hs.fnutils.each(self.hooks[hookType], function(item) self:_executeCmd(item, args, hookType) end)
+	hs.fnutils.each(self.hooks[hookType], function(item) self:_executeCmd(item, args, hookType, immediate) end)
 end
 
 function obj:_caffeinateWatcherCallback(event)
@@ -292,11 +299,24 @@ function obj:start()
 		#self.hooks[WIFI]
 	)
 	if self.suspendWatcher then self.suspendWatcher:stop() end
-	self.suspendWatcher = hs.caffeinate.watcher.new(hs.fnutils.partial(self._caffeinateWatcherCallback, self))
-	self.suspendWatcher:start()
+	local suspendOk, suspendWatcherOrErr =
+		pcall(hs.caffeinate.watcher.new, hs.fnutils.partial(self._caffeinateWatcherCallback, self))
+	if suspendOk then
+		self.suspendWatcher = suspendWatcherOrErr
+		self.suspendWatcher:start()
+	else
+		logger.w("Failed to create caffeinate watcher: " .. tostring(suspendWatcherOrErr))
+		self.suspendWatcher = nil
+	end
 	if self.wifiWatcher then self.wifiWatcher:stop() end
-	self.wifiWatcher = hs.wifi.watcher.new(hs.fnutils.partial(self._ssidChangedCallback, self))
-	self.wifiWatcher:start()
+	local wifiOk, wifiWatcherOrErr = pcall(hs.wifi.watcher.new, hs.fnutils.partial(self._ssidChangedCallback, self))
+	if wifiOk then
+		self.wifiWatcher = wifiWatcherOrErr
+		self.wifiWatcher:start()
+	else
+		logger.w("Failed to create wifi watcher: " .. tostring(wifiWatcherOrErr))
+		self.wifiWatcher = nil
+	end
 	self:_execHooks(RESUME)
 	self:_ssidChangedCallback()
 end
@@ -306,7 +326,7 @@ end
 --- Stop all monitoring, cancel pending timers, fire suspend hooks synchronously,
 --- then run any whenStop commands.
 function obj:stop()
-	logger.i("Stopping " .. obj.name)
+	logger.i("Stopping " .. self.name)
 	self:_cancelAllTimers()
 	if self.suspendWatcher then
 		self.suspendWatcher:stop()
@@ -316,7 +336,10 @@ function obj:stop()
 		self.wifiWatcher:stop()
 		self.wifiWatcher = nil
 	end
-	self:_execHooks(SUSPEND, nil, true)
+	-- immediate=true: run delayed whenSuspend hooks synchronously rather than
+	-- scheduling them via a timer, since the _cancelAllTimers() call below
+	-- would otherwise cancel them before they ever fire.
+	self:_execHooks(SUSPEND, nil, true, true)
 	self:_cancelAllTimers()
 	for _, item in ipairs(self.hooks[STOP]) do
 		local parts = { shellQuote(item.cmd) }
@@ -325,7 +348,8 @@ function obj:stop()
 		end
 		local fullCmd = table.concat(parts, " ")
 		logger.i("Executing stop command: " .. fullCmd)
-		hs.execute(fullCmd, true)
+		local execOk, execErr = pcall(hs.execute, fullCmd, true)
+		if not execOk then logger.w("Failed to execute stop command '" .. fullCmd .. "': " .. tostring(execErr)) end
 	end
 end
 

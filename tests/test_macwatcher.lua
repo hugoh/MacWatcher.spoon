@@ -106,17 +106,17 @@ describe("MacWatcher Spoon", function()
 		assert.are.same({}, w._executed[2].args) -- no extra args for suspend
 	end)
 
-	it("_executeAfter cancels prior timer for same key", function()
+	it("_executeAfter cancels prior timer for same key (same cmd and args)", function()
 		overrideExecute(w)
 
-		-- Schedule with delay (no hookType → key is ":echo")
+		-- Schedule with delay (no hookType → key includes ":echo" and the args)
 		w:_executeAfter("echo", { "a" }, 5)
-		local key = ":echo"
+		local key = ":echo:" .. hs.inspect({ "a" })
 		local t1 = w._timers[key]
 		assert.is_true(t1 ~= nil)
 
-		-- Re-schedule; should cancel t1
-		w:_executeAfter("echo", { "b" }, 5)
+		-- Re-schedule with identical args; should cancel t1
+		w:_executeAfter("echo", { "a" }, 5)
 		local t2 = w._timers[key]
 		assert.is_true(t2 ~= nil and t2 ~= t1)
 		assert.is_true(t1._stopped == true)
@@ -125,7 +125,29 @@ describe("MacWatcher Spoon", function()
 		t2:fire()
 		assert.are.equal(1, #w._executed)
 		assert.are.equal("echo", w._executed[1].cmd)
-		assert.are.same({ "b" }, w._executed[1].args)
+		assert.are.same({ "a" }, w._executed[1].args)
+	end)
+
+	it("_executeAfter does not cancel a pending timer for the same cmd with different args", function()
+		overrideExecute(w)
+
+		-- Two hooks of the same type/cmd but different args should both be scheduled,
+		-- not cancel each other (dedup key must include args).
+		w:_executeAfter("echo", { "a" }, 5, "resume")
+		w:_executeAfter("echo", { "b" }, 5, "resume")
+
+		local timers = {}
+		for _, t in pairs(w._timers) do
+			table.insert(timers, t)
+		end
+		assert.are.equal(2, #timers)
+		assert.is_false(timers[1]._stopped)
+		assert.is_false(timers[2]._stopped)
+
+		for _, t in ipairs(timers) do
+			t:fire()
+		end
+		assert.are.equal(2, #w._executed)
 	end)
 
 	it("cooldown allows re-execution when args differ for same hook", function()
@@ -177,6 +199,29 @@ describe("MacWatcher Spoon", function()
 		end
 	end)
 
+	it("stop() logs using self.name, not the module-level obj.name (multi-instance safe)", function()
+		-- Capture the logger instance created when init.lua is loaded, so we can
+		-- inspect what it logged.
+		local capturedLogger
+		local origNew = hs.logger.new
+		hs.logger.new = function(...)
+			capturedLogger = origNew(...)
+			return capturedLogger
+		end
+		local w2 = dofile("init.lua")
+		hs.logger.new = origNew
+
+		local instance = setmetatable({ name = "OtherInstance" }, { __index = w2 })
+		instance:start()
+		instance:stop()
+
+		local found = false
+		for _, entry in ipairs(capturedLogger._logs) do
+			if entry.msg == "Stopping OtherInstance" then found = true end
+		end
+		assert.is_true(found)
+	end)
+
 	it("stop() stops and nils the watchers", function()
 		w:start()
 		local sw, ww = w.suspendWatcher, w.wifiWatcher
@@ -224,12 +269,15 @@ describe("MacWatcher Spoon", function()
 		assert.are.equal(0, #w._timers)
 	end)
 
-	it("stop() cancels any timers created by delayed suspend hooks", function()
+	it("stop() runs delayed suspend hooks immediately instead of dropping them", function()
 		overrideExecute(w)
-		w:whenSuspend({ "delayed-cleanup" }, 10) -- delay > 0: would normally create a timer
+		w:whenSuspend({ "delayed-cleanup" }, 10) -- delay > 0: would normally be scheduled via a timer
 		w:start()
 		w:stop()
-		-- timer created by _execHooks(SUSPEND) inside stop() must be cancelled before stop() returns
+		-- the hook must actually execute during stop(), not just get cancelled
+		assert.are.equal(1, #w._executed)
+		assert.are.equal("delayed-cleanup", w._executed[1].cmd)
+		-- and no leftover timer should exist for it
 		assert.are.equal(0, #w._timers)
 	end)
 
@@ -296,9 +344,9 @@ describe("MacWatcher Spoon", function()
 
 	it("_executeAsyncCmd clears timeout timer on successful completion", function()
 		w:_executeAsyncCmd("echo", { "hi" })
-		-- mock task completes synchronously; timeout timer should be stopped
-		for key, _ in pairs(w._timers) do
-			assert.is_false(key:sub(1, 9) == "__timeout", "timeout timer still present: " .. key)
+		-- mock task completes synchronously; watchdog timer should be cleaned up
+		for key, _ in pairs(w._watchdogTimers) do
+			assert.is_false(key:sub(1, 9) == "__timeout", "watchdog timer still present: " .. key)
 		end
 	end)
 
