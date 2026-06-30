@@ -106,17 +106,17 @@ describe("MacWatcher Spoon", function()
 		assert.are.same({}, w._executed[2].args) -- no extra args for suspend
 	end)
 
-	it("_executeAfter cancels prior timer for same key", function()
+	it("_executeAfter cancels prior timer for same key (same cmd and args)", function()
 		overrideExecute(w)
 
-		-- Schedule with delay (no hookType → key is ":echo")
+		-- Schedule with delay (no hookType → key includes ":echo" and the args)
 		w:_executeAfter("echo", { "a" }, 5)
-		local key = ":echo"
+		local key = ":echo:" .. hs.inspect({ "a" })
 		local t1 = w._timers[key]
 		assert.is_true(t1 ~= nil)
 
-		-- Re-schedule; should cancel t1
-		w:_executeAfter("echo", { "b" }, 5)
+		-- Re-schedule with identical args; should cancel t1
+		w:_executeAfter("echo", { "a" }, 5)
 		local t2 = w._timers[key]
 		assert.is_true(t2 ~= nil and t2 ~= t1)
 		assert.is_true(t1._stopped == true)
@@ -125,7 +125,29 @@ describe("MacWatcher Spoon", function()
 		t2:fire()
 		assert.are.equal(1, #w._executed)
 		assert.are.equal("echo", w._executed[1].cmd)
-		assert.are.same({ "b" }, w._executed[1].args)
+		assert.are.same({ "a" }, w._executed[1].args)
+	end)
+
+	it("_executeAfter does not cancel a pending timer for the same cmd with different args", function()
+		overrideExecute(w)
+
+		-- Two hooks of the same type/cmd but different args should both be scheduled,
+		-- not cancel each other (dedup key must include args).
+		w:_executeAfter("echo", { "a" }, 5, "resume")
+		w:_executeAfter("echo", { "b" }, 5, "resume")
+
+		local timers = {}
+		for _, t in pairs(w._timers) do
+			table.insert(timers, t)
+		end
+		assert.are.equal(2, #timers)
+		assert.is_false(timers[1]._stopped)
+		assert.is_false(timers[2]._stopped)
+
+		for _, t in ipairs(timers) do
+			t:fire()
+		end
+		assert.are.equal(2, #w._executed)
 	end)
 
 	it("cooldown allows re-execution when args differ for same hook", function()

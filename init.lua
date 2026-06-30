@@ -110,7 +110,7 @@ function obj:_execute(cmd, args)
 end
 
 function obj:_executeAfter(cmd, args, delay, hookType, immediate)
-	local timerKey = (hookType or "") .. ":" .. tostring(cmd)
+	local timerKey = (hookType or "") .. ":" .. tostring(cmd) .. ":" .. hs.inspect(args)
 	if self._timers[timerKey] then
 		logger.df("Canceling existing timer for key: %s", timerKey)
 		self._timers[timerKey]:stop()
