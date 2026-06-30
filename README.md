@@ -2,6 +2,7 @@
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Hammerspoon Spoon](https://img.shields.io/badge/Hammerspoon-Spoon-FFA500.svg)](https://www.hammerspoon.org/docs/index.html)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://hugoh.github.io/MacWatcher.spoon/)
 
 A Hammerspoon Spoon that executes commands on system events like wake, sleep, and WiFi changes.
 
@@ -60,11 +61,6 @@ macWatcher
 macWatcher:start()
 ```
 
-## Methods
+## API documentation
 
-- `whenResume({ command, ... }, delay)` - Run command after wake/unlock, optionally after `delay` seconds
-- `whenSuspend({ command, ... }, delay)` - Run command before sleep/lock, optionally after `delay` seconds
-- `onWifiChange({ command, ... }, delay)` - Run command when WiFi network changes; current SSID is appended as an extra argument
-- `whenStop({ command, ... })` - Run command synchronously when `stop()` is called (useful for teardown scripts that must complete before the process exits)
-- `start()` - Begin monitoring system events; also fires resume hooks and the current WiFi hook immediately
-- `stop()` - Stop all monitoring, cancel pending timers, fire suspend hooks, then run any `whenStop` commands
+Full API reference is available at **<https://hugoh.github.io/MacWatcher.spoon/>**.
