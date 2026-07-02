@@ -217,7 +217,7 @@ describe("MacWatcher Spoon", function()
 
 		local found = false
 		for _, entry in ipairs(capturedLogger._logs) do
-			if entry.msg == "Stopping OtherInstance" then found = true end
+			if entry.msg == "Stopping OtherInstance v" .. w2.version then found = true end
 		end
 		assert.is_true(found)
 	end)

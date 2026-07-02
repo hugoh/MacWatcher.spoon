@@ -291,12 +291,13 @@ end
 --- Start monitoring system events.
 --- Also immediately fires resume hooks and evaluates the current WiFi state.
 function obj:start()
+	logger.f("Starting %s v%s", self.name, self.version)
 	logger.f(
-		"Starting %s (resume: %d, suspend: %d, wifi: %d hooks)",
-		self.name,
+		"Registered hooks: resume=%d, suspend=%d, wifi=%d, stop=%d",
 		#self.hooks[RESUME],
 		#self.hooks[SUSPEND],
-		#self.hooks[WIFI]
+		#self.hooks[WIFI],
+		#self.hooks[STOP]
 	)
 	if self.suspendWatcher then self.suspendWatcher:stop() end
 	local suspendOk, suspendWatcherOrErr =
@@ -326,7 +327,7 @@ end
 --- Stop all monitoring, cancel pending timers, fire suspend hooks synchronously,
 --- then run any whenStop commands.
 function obj:stop()
-	logger.i("Stopping " .. self.name)
+	logger.f("Stopping %s v%s", self.name, self.version)
 	self:_cancelAllTimers()
 	if self.suspendWatcher then
 		self.suspendWatcher:stop()
