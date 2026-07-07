@@ -55,6 +55,19 @@ function M.setup()
 	function hs.fnutils.partial(fn, self)
 		return function(...) return fn(self, ...) end
 	end
+	function hs.fnutils.copy(t)
+		local copy = {}
+		for k, v in pairs(t) do
+			copy[k] = v
+		end
+		return copy
+	end
+	function hs.fnutils.concat(t1, t2)
+		for _, v in ipairs(t2) do
+			table.insert(t1, v)
+		end
+		return t1
+	end
 
 	-- Time/timers
 	local now = 0
