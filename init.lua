@@ -148,7 +148,7 @@ function obj:_executeCmd(item, extraArgs, hookType, immediate)
 	local args
 	if hasElements(item.args) then
 		if hasElements(extraArgs) then
-			args = { table.unpack(item.args), table.unpack(extraArgs) }
+			args = hs.fnutils.concat(hs.fnutils.copy(item.args), extraArgs)
 		else
 			args = item.args
 		end

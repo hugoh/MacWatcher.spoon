@@ -39,6 +39,18 @@ describe("MacWatcher Spoon", function()
 		assert.are.same({ "a", "b" }, w._executed[1].args)
 	end)
 
+	it("_executeCmd merges extraArgs without dropping multi-element item.args", function()
+		overrideExecute(w)
+
+		local item = { cmd = "echo", args = { "a", "b" }, delay = 0 }
+		w:_executeCmd(item, { "c" })
+		assert.are.equal(1, #w._executed)
+		assert.are.equal("echo", w._executed[1].cmd)
+		assert.are.same({ "a", "b", "c" }, w._executed[1].args)
+		-- item.args must not be mutated, since it's reused on every future firing
+		assert.are.same({ "a", "b" }, item.args)
+	end)
+
 	it("cooldown prevents rapid re-execution for same hook", function()
 		overrideExecute(w)
 		w.cooldown = 5
