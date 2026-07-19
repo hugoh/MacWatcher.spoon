@@ -40,4 +40,4 @@ run = "busted -p 'test_.*%.lua' tests"
 postinstall = ["luarocks install busted", "luarocks install luacheck"]
 
 [settings]
-experimental = true # for hooks
+experimental = true
