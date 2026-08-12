@@ -2,7 +2,7 @@
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Hammerspoon Spoon](https://img.shields.io/badge/Hammerspoon-Spoon-FFA500.svg)](https://www.hammerspoon.org/docs/index.html)
-[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://hugoh.github.io/MacWatcher.spoon/)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://macwatcher-spoon.larve.net/)
 
 A Hammerspoon Spoon that executes commands on system events like wake, sleep, and WiFi changes.
 
@@ -63,4 +63,4 @@ macWatcher:start()
 
 ## API documentation
 
-Full API reference is available at **<https://hugoh.github.io/MacWatcher.spoon/>**.
+Full API reference is available at **<https://macwatcher-spoon.larve.net/>**.
