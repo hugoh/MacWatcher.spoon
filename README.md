@@ -11,6 +11,7 @@ A Hammerspoon Spoon that executes commands on system events like wake, sleep, an
 - Execute commands when resuming from sleep/unlock
 - Trigger actions when system goes to sleep/locks
 - Monitor WiFi network changes
+- React to light/dark appearance changes, including ones crossed while asleep
 - Configurable execution delays and cooldown periods
 - Async command execution with timeouts
 
@@ -55,6 +56,7 @@ macWatcher
   :whenResume({"/bin/echo", "System resumed"}, 2)   -- Run 2 seconds after a session is resumed
   :whenSuspend({"/usr/bin/true"}, 0)                -- Run immediately before sleep
   :onWifiChange({"/usr/local/bin/ssid_handler"}, 1) -- Run 1s after WiFi change (SSID appended as argument)
+  :onThemeChange({"/usr/local/bin/theme_handler"})  -- Run on light/dark change and on wake ("light"/"dark" appended as argument)
   :whenStop({"/usr/local/bin/teardown"})            -- Run synchronously when stop() is called
 
 -- Start monitoring
