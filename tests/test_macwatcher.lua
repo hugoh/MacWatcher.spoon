@@ -177,6 +177,67 @@ describe("MacWatcher Spoon", function()
 		assert.are.equal(2, #w._executed)
 	end)
 
+	it("onThemeChange and _themeChangedCallback pass current appearance", function()
+		overrideExecute(w)
+		mock._setInterfaceStyle("Dark")
+
+		w:onThemeChange({ "echo" }, 0)
+		w:_themeChangedCallback()
+
+		assert.are.equal(1, #w._executed)
+		assert.are.same({ "dark" }, w._executed[1].args)
+	end)
+
+	it("_themeChangedCallback reports light appearance when not Dark", function()
+		overrideExecute(w)
+		mock._setInterfaceStyle("")
+
+		w:onThemeChange({ "echo" }, 0)
+		w:_themeChangedCallback()
+
+		assert.are.same({ "light" }, w._executed[1].args)
+	end)
+
+	it("onThemeChange is chainable", function()
+		local result = w:onThemeChange({ "x" }, 0)
+		assert.are.equal(w, result)
+	end)
+
+	it("_caffeinateWatcherCallback also fires theme hooks on resume events", function()
+		overrideExecute(w)
+		mock._setInterfaceStyle("Dark")
+		w:onThemeChange({ "theme" }, 0)
+
+		w:_caffeinateWatcherCallback(hs.caffeinate.watcher.screensDidWake)
+
+		assert.are.equal(1, #w._executed)
+		assert.are.equal("theme", w._executed[1].cmd)
+		assert.are.same({ "dark" }, w._executed[1].args)
+	end)
+
+	it("start initializes the theme watcher and fires theme hooks", function()
+		overrideExecute(w)
+		mock._setInterfaceStyle("Dark")
+		w:onThemeChange({ "theme" }, 0)
+
+		w:start()
+
+		assert.is_true(w.themeWatcher ~= nil and w.themeWatcher._started == true)
+		local found = false
+		for _, entry in ipairs(w._executed) do
+			if entry.cmd == "theme" then found = true end
+		end
+		assert.is_true(found)
+	end)
+
+	it("stop() stops and nils the theme watcher", function()
+		w:start()
+		local tw = w.themeWatcher
+		w:stop()
+		assert.is_true(tw._started == false)
+		assert.is_nil(w.themeWatcher)
+	end)
+
 	it("whenSuspend is chainable", function()
 		local result = w:whenSuspend({ "x" }, 0)
 		assert.are.equal(w, result)

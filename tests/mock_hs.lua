@@ -153,6 +153,21 @@ function M.setup()
 		return o
 	end
 
+	-- Host appearance
+	hs.host = {}
+	local interfaceStyle = "Dark"
+	function hs.host.interfaceStyle() return interfaceStyle end
+	function M._setInterfaceStyle(s) interfaceStyle = s end
+
+	-- Distributed notifications
+	hs.distributednotifications = {}
+	function hs.distributednotifications.new(cb)
+		local o = { _cb = cb, _started = false }
+		function o:start() self._started = true end
+		function o:stop() self._started = false end
+		return o
+	end
+
 	-- execute (blocking shell command)
 	local executed = {}
 	function hs.execute(cmd, _blocking)

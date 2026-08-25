@@ -17,14 +17,17 @@ local RESUME = "resume"
 local SUSPEND = "suspend"
 local WIFI = "wifi"
 local STOP = "stop"
+local THEME = "theme"
 
 obj.suspendWatcher = nil
 obj.wifiWatcher = nil
+obj.themeWatcher = nil
 obj.hooks = {}
 obj.hooks[RESUME] = {}
 obj.hooks[SUSPEND] = {}
 obj.hooks[WIFI] = {}
 obj.hooks[STOP] = {}
+obj.hooks[THEME] = {}
 obj._timers = {}
 obj._watchdogTimers = {}
 obj._timerSeq = 0
@@ -204,6 +207,21 @@ function obj:whenSuspend(cmd, delay) return self:_cmdAdd(SUSPEND, cmd, delay) en
 ---  * The MacWatcher object, for method chaining
 function obj:onWifiChange(cmd, delay) return self:_cmdAdd(WIFI, cmd, delay) end
 
+--- MacWatcher:onThemeChange(cmd[, delay]) -> MacWatcher
+--- Method
+--- Register a command to run when the light/dark appearance changes, or when
+--- the system wakes (a scheduled appearance switch that occurs while asleep
+--- fires no live notification, so wake re-checks it too).
+--- The current appearance ("light" or "dark") is appended as an extra argument to the command.
+---
+--- Parameters:
+---  * cmd - A table where the first element is the executable path and remaining elements are arguments
+---  * delay - (optional) Seconds to wait before executing; default 0
+---
+--- Returns:
+---  * The MacWatcher object, for method chaining
+function obj:onThemeChange(cmd, delay) return self:_cmdAdd(THEME, cmd, delay) end
+
 --- MacWatcher:whenStop(cmd) -> MacWatcher
 --- Method
 --- Register a command to run synchronously when stop() is called.
@@ -265,6 +283,7 @@ function obj:_caffeinateWatcherCallback(event)
 	then
 		logger.i("Executing resume hooks")
 		self:_execHooks(RESUME)
+		self:_themeChangedCallback()
 	elseif
 		event == hs.caffeinate.watcher.screensaverDidStart
 		or event == hs.caffeinate.watcher.screensDidLock
@@ -286,6 +305,14 @@ function obj:_ssidChangedCallback()
 	self:_execHooks(WIFI, { currentSSID })
 end
 
+local function currentAppearance() return hs.host.interfaceStyle() == "Dark" and "dark" or "light" end
+
+function obj:_themeChangedCallback()
+	local appearance = currentAppearance()
+	logger.f("Executing theme hooks for appearance '%s'", appearance)
+	self:_execHooks(THEME, { appearance })
+end
+
 --- MacWatcher:start()
 --- Method
 --- Start monitoring system events.
@@ -293,10 +320,11 @@ end
 function obj:start()
 	logger.f("Starting %s v%s", self.name, self.version)
 	logger.f(
-		"Registered hooks: resume=%d, suspend=%d, wifi=%d, stop=%d",
+		"Registered hooks: resume=%d, suspend=%d, wifi=%d, theme=%d, stop=%d",
 		#self.hooks[RESUME],
 		#self.hooks[SUSPEND],
 		#self.hooks[WIFI],
+		#self.hooks[THEME],
 		#self.hooks[STOP]
 	)
 	if self.suspendWatcher then self.suspendWatcher:stop() end
@@ -318,8 +346,22 @@ function obj:start()
 		logger.w("Failed to create wifi watcher: " .. tostring(wifiWatcherOrErr))
 		self.wifiWatcher = nil
 	end
+	if self.themeWatcher then self.themeWatcher:stop() end
+	local themeOk, themeWatcherOrErr = pcall(
+		hs.distributednotifications.new,
+		hs.fnutils.partial(self._themeChangedCallback, self),
+		"AppleInterfaceThemeChangedNotification"
+	)
+	if themeOk then
+		self.themeWatcher = themeWatcherOrErr
+		self.themeWatcher:start()
+	else
+		logger.w("Failed to create theme watcher: " .. tostring(themeWatcherOrErr))
+		self.themeWatcher = nil
+	end
 	self:_execHooks(RESUME)
 	self:_ssidChangedCallback()
+	self:_themeChangedCallback()
 end
 
 --- MacWatcher:stop()
@@ -336,6 +378,10 @@ function obj:stop()
 	if self.wifiWatcher then
 		self.wifiWatcher:stop()
 		self.wifiWatcher = nil
+	end
+	if self.themeWatcher then
+		self.themeWatcher:stop()
+		self.themeWatcher = nil
 	end
 	-- immediate=true: run delayed whenSuspend hooks synchronously rather than
 	-- scheduling them via a timer, since the _cancelAllTimers() call below
