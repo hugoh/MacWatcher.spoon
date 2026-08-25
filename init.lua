@@ -313,6 +313,14 @@ function obj:_themeChangedCallback()
 	self:_execHooks(THEME, { appearance })
 end
 
+function obj:_logHooks()
+	for _, hookType in ipairs({ RESUME, SUSPEND, WIFI, THEME, STOP }) do
+		for _, item in ipairs(self.hooks[hookType]) do
+			logger.f("Hook %s: %s %s", hookType, item.cmd, hs.inspect(item.args))
+		end
+	end
+end
+
 --- MacWatcher:start()
 --- Method
 --- Start monitoring system events.
@@ -327,6 +335,7 @@ function obj:start()
 		#self.hooks[THEME],
 		#self.hooks[STOP]
 	)
+	self:_logHooks()
 	if self.suspendWatcher then self.suspendWatcher:stop() end
 	local suspendOk, suspendWatcherOrErr =
 		pcall(hs.caffeinate.watcher.new, hs.fnutils.partial(self._caffeinateWatcherCallback, self))
