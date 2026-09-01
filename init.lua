@@ -12,6 +12,9 @@ obj.__index = obj
 -- Metadata
 obj.name = "MacWatcher"
 obj.version = "dev"
+obj.author = "Hugo Haas"
+obj.license = "MIT"
+obj.homepage = "https://github.com/hugoh/MacWatcher.spoon"
 
 local RESUME = "resume"
 local SUSPEND = "suspend"
@@ -321,12 +324,19 @@ function obj:_logHooks()
 	end
 end
 
+--- MacWatcher:init()
+--- Method
+--- Called automatically by `hs.loadSpoon()`. Logs the loaded version.
+function obj:init()
+	logger.f("Loaded %s v%s", self.name, self.version)
+	return self
+end
+
 --- MacWatcher:start()
 --- Method
 --- Start monitoring system events.
 --- Also immediately fires resume hooks and evaluates the current WiFi state.
 function obj:start()
-	logger.f("Starting %s v%s", self.name, self.version)
 	logger.f(
 		"Registered hooks: resume=%d, suspend=%d, wifi=%d, theme=%d, stop=%d",
 		#self.hooks[RESUME],
