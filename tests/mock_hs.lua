@@ -36,6 +36,13 @@ local function simpleInspect(v, seen)
 	return "{" .. table.concat(parts, ",") .. "}"
 end
 
+function M._makeStartStopWatcher(cb)
+	local o = { _cb = cb, _started = false }
+	function o:start() self._started = true end
+	function o:stop() self._started = false end
+	return o
+end
+
 function M.setup()
 	local hs = {}
 
@@ -132,12 +139,7 @@ function M.setup()
 	hs.caffeinate.watcher.sessionDidResignActive = "sessionDidResignActive"
 	hs.caffeinate.watcher.systemDidWake = "systemDidWake"
 
-	function hs.caffeinate.watcher.new(cb)
-		local o = { _cb = cb, _started = false }
-		function o:start() self._started = true end
-		function o:stop() self._started = false end
-		return o
-	end
+	function hs.caffeinate.watcher.new(cb) return M._makeStartStopWatcher(cb) end
 
 	-- WiFi
 	hs.wifi = {}
@@ -146,12 +148,7 @@ function M.setup()
 	function M._setSSID(s) ssid = s end
 
 	hs.wifi.watcher = {}
-	function hs.wifi.watcher.new(cb)
-		local o = { _cb = cb, _started = false }
-		function o:start() self._started = true end
-		function o:stop() self._started = false end
-		return o
-	end
+	function hs.wifi.watcher.new(cb) return M._makeStartStopWatcher(cb) end
 
 	-- Host appearance
 	hs.host = {}
@@ -161,12 +158,7 @@ function M.setup()
 
 	-- Distributed notifications
 	hs.distributednotifications = {}
-	function hs.distributednotifications.new(cb)
-		local o = { _cb = cb, _started = false }
-		function o:start() self._started = true end
-		function o:stop() self._started = false end
-		return o
-	end
+	function hs.distributednotifications.new(cb) return M._makeStartStopWatcher(cb) end
 
 	-- execute (blocking shell command)
 	local executed = {}

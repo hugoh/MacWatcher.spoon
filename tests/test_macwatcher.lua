@@ -10,6 +10,11 @@ describe("MacWatcher Spoon", function()
 		function target:_execute(cmd, args) table.insert(self._executed, { cmd = cmd, args = args }) end
 	end
 
+	local function assertExecuted(executed, index, cmd, args)
+		assert.are.equal(cmd, executed[index].cmd)
+		assert.are.same(args, executed[index].args)
+	end
+
 	before_each(function()
 		mock.setup()
 		w = dofile("init.lua")
@@ -23,8 +28,7 @@ describe("MacWatcher Spoon", function()
 
 		w:_execHooks("resume")
 		assert.are.equal(1, #w._executed)
-		assert.are.equal("echo", w._executed[1].cmd)
-		assert.are.same({ "hi" }, w._executed[1].args)
+		assertExecuted(w._executed, 1, "echo", { "hi" })
 	end)
 
 	it("_executeCmd merges extraArgs", function()
@@ -32,8 +36,7 @@ describe("MacWatcher Spoon", function()
 
 		w:_executeCmd({ cmd = "echo", args = { "a" }, delay = 0 }, { "b" })
 		assert.are.equal(1, #w._executed)
-		assert.are.equal("echo", w._executed[1].cmd)
-		assert.are.same({ "a", "b" }, w._executed[1].args)
+		assertExecuted(w._executed, 1, "echo", { "a", "b" })
 	end)
 
 	it("_executeCmd merges extraArgs without dropping multi-element item.args", function()
@@ -42,8 +45,7 @@ describe("MacWatcher Spoon", function()
 		local item = { cmd = "echo", args = { "a", "b" }, delay = 0 }
 		w:_executeCmd(item, { "c" })
 		assert.are.equal(1, #w._executed)
-		assert.are.equal("echo", w._executed[1].cmd)
-		assert.are.same({ "a", "b", "c" }, w._executed[1].args)
+		assertExecuted(w._executed, 1, "echo", { "a", "b", "c" })
 		-- item.args must not be mutated, since it's reused on every future firing
 		assert.are.same({ "a", "b" }, item.args)
 	end)
@@ -83,11 +85,8 @@ describe("MacWatcher Spoon", function()
 
 		assert.are.equal(2, #w._executed)
 		-- Execution order: resume first, then wifi
-		assert.are.equal("echo", w._executed[1].cmd)
-		assert.are.same({ "r" }, w._executed[1].args)
-
-		assert.are.equal("echo", w._executed[2].cmd)
-		assert.are.same({ "w", "HomeNet" }, w._executed[2].args)
+		assertExecuted(w._executed, 1, "echo", { "r" })
+		assertExecuted(w._executed, 2, "echo", { "w", "HomeNet" })
 	end)
 
 	it("_ssidChangedCallback passes current SSID", function()
@@ -133,8 +132,7 @@ describe("MacWatcher Spoon", function()
 		-- Fire the second timer; should execute once with latest args
 		t2:fire()
 		assert.are.equal(1, #w._executed)
-		assert.are.equal("echo", w._executed[1].cmd)
-		assert.are.same({ "a" }, w._executed[1].args)
+		assertExecuted(w._executed, 1, "echo", { "a" })
 	end)
 
 	it("_executeAfter does not cancel a pending timer for the same cmd with different args", function()
@@ -208,8 +206,7 @@ describe("MacWatcher Spoon", function()
 		w:_caffeinateWatcherCallback(hs.caffeinate.watcher.screensDidWake)
 
 		assert.are.equal(1, #w._executed)
-		assert.are.equal("theme", w._executed[1].cmd)
-		assert.are.same({ "dark" }, w._executed[1].args)
+		assertExecuted(w._executed, 1, "theme", { "dark" })
 	end)
 
 	it("start initializes the theme watcher and fires theme hooks", function()
