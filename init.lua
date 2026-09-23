@@ -22,6 +22,11 @@ local WIFI = "wifi"
 local STOP = "stop"
 local THEME = "theme"
 
+-- Hook types whose args describe current state rather than a discrete event:
+-- a newer firing always supersedes an older still-pending one, regardless of
+-- args, so a stale state can't run after a newer one already superseded it.
+local LATEST_WINS_HOOKS = { [WIFI] = true, [THEME] = true }
+
 obj.suspendWatcher = nil
 obj.wifiWatcher = nil
 obj.themeWatcher = nil
@@ -116,7 +121,12 @@ function obj:_execute(cmd, args)
 end
 
 function obj:_executeAfter(cmd, args, delay, hookType, immediate)
-	local timerKey = (hookType or "") .. ":" .. tostring(cmd) .. ":" .. hs.inspect(args)
+	local timerKey
+	if LATEST_WINS_HOOKS[hookType] then
+		timerKey = hookType .. ":" .. tostring(cmd)
+	else
+		timerKey = (hookType or "") .. ":" .. tostring(cmd) .. ":" .. hs.inspect(args)
+	end
 	if self._timers[timerKey] then
 		logger.df("Canceling existing timer for key: %s", timerKey)
 		self._timers[timerKey]:stop()

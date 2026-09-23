@@ -157,6 +157,55 @@ describe("MacWatcher Spoon", function()
 		assert.are.equal(2, #w._executed)
 	end)
 
+	it("_executeAfter cancels a pending WIFI timer even when SSID args differ", function()
+		overrideExecute(w)
+
+		-- A disconnect ('') hook should be superseded by a reconnect
+		-- (new SSID) hook before it fires, since only the latest WiFi
+		-- state matters.
+		w:_executeAfter("wifi-based-setup", { "" }, 5, "wifi")
+		local t1
+		for _, t in pairs(w._timers) do
+			t1 = t
+		end
+		assert.is_true(t1 ~= nil)
+
+		w:_executeAfter("wifi-based-setup", { "CorpWag" }, 5, "wifi")
+		local timers = {}
+		for _, t in pairs(w._timers) do
+			table.insert(timers, t)
+		end
+		assert.are.equal(1, #timers)
+		assert.is_true(t1._stopped == true)
+
+		timers[1]:fire()
+		assert.are.equal(1, #w._executed)
+		assertExecuted(w._executed, 1, "wifi-based-setup", { "CorpWag" })
+	end)
+
+	it("_executeAfter cancels a pending THEME timer even when appearance args differ", function()
+		overrideExecute(w)
+
+		w:_executeAfter("theme-based-setup", { "dark" }, 5, "theme")
+		local t1
+		for _, t in pairs(w._timers) do
+			t1 = t
+		end
+		assert.is_true(t1 ~= nil)
+
+		w:_executeAfter("theme-based-setup", { "light" }, 5, "theme")
+		local timers = {}
+		for _, t in pairs(w._timers) do
+			table.insert(timers, t)
+		end
+		assert.are.equal(1, #timers)
+		assert.is_true(t1._stopped == true)
+
+		timers[1]:fire()
+		assert.are.equal(1, #w._executed)
+		assertExecuted(w._executed, 1, "theme-based-setup", { "light" })
+	end)
+
 	it("cooldown allows re-execution when args differ for same hook", function()
 		overrideExecute(w)
 		w.cooldown = 5
