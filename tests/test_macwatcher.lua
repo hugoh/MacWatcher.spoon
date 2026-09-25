@@ -157,6 +157,54 @@ describe("MacWatcher Spoon", function()
 		assert.are.equal(2, #w._executed)
 	end)
 
+	describe("overlapping runs", function()
+		local tasks
+
+		before_each(function()
+			tasks = {}
+			hs.task.new = function(_cmd, completionFn, _streamFn, args)
+				local task = { _args = args, _running = false, _done = completionFn }
+				function task.start(t)
+					t._running = true
+					return t
+				end
+				function task.closeInput() end
+				function task.terminate(t) t._running = false end
+				function task.isRunning(t) return t._running end
+				function task.pid() return 1 end
+				table.insert(tasks, task)
+				return task
+			end
+		end)
+
+		it("terminates a still-running WiFi hook when a newer SSID supersedes it", function()
+			w:_executeAfter("setup", { "Home" }, 0, "wifi")
+			w:_executeAfter("setup", { "Office" }, 0, "wifi")
+
+			assert.is_false(tasks[1]._running)
+			assert.is_true(tasks[2]._running)
+		end)
+
+		it("lets overlapping runs of other hooks finish", function()
+			w:_executeAfter("sync", {}, 0, "resume")
+			w:_executeAfter("sync", {}, 0, "resume")
+
+			assert.is_true(tasks[1]._running)
+			assert.is_true(tasks[2]._running)
+		end)
+
+		it("doesn't terminate a newer run when an older one exits", function()
+			w:_executeAfter("setup", { "Home" }, 0, "wifi")
+			local older = tasks[1]
+			w:_executeAfter("setup", { "Office" }, 0, "wifi")
+			older._done(0, "", "")
+			w:_executeAfter("setup", { "Cafe" }, 0, "wifi")
+
+			assert.is_false(tasks[2]._running)
+			assert.is_true(tasks[3]._running)
+		end)
+	end)
+
 	it("_executeAfter cancels a pending WIFI timer even when SSID args differ", function()
 		overrideExecute(w)
 
