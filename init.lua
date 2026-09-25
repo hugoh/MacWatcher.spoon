@@ -39,6 +39,8 @@ obj.hooks[THEME] = {}
 obj._timers = {}
 obj._watchdogTimers = {}
 obj._timerSeq = 0
+-- Running task per LATEST_WINS_HOOKS key, so a newer run can terminate it.
+obj._latestTasks = {}
 --- MacWatcher.cooldown
 --- Variable
 --- Minimum seconds between repeated hook executions for the same event (default: 5).
@@ -61,13 +63,15 @@ local function debugOut(label, data)
 	end
 end
 
-function obj:_executeAsyncCmd(cmd, args)
+function obj:_executeAsyncCmd(cmd, args, supersedeKey)
 	local fullCmd = cmd .. "; args: " .. hs.inspect(args)
 	logger.i("Executing command: " .. fullCmd)
 	self._timerSeq = self._timerSeq + 1
 	local timeoutKey = "__timeout_" .. self._timerSeq
 	local timeoutTimer
-	local task = hs.task.new(cmd, function(exitCode, stdOut, stdErr)
+	local task
+	task = hs.task.new(cmd, function(exitCode, stdOut, stdErr)
+		if supersedeKey and self._latestTasks[supersedeKey] == task then self._latestTasks[supersedeKey] = nil end
 		-- FIXME: Getting errors:
 		-- ** Warning:   LuaSkin: hs.task terminationHandler block encountered an exception:
 		--		 *** -[NSConcreteFileHandle readDataOfLength:]: Resource temporarily unavailable
@@ -108,16 +112,26 @@ function obj:_executeAsyncCmd(cmd, args)
 	-- and cleanup must not depend on the timeoutTimer upvalue having been
 	-- assigned, to be reliably stopped/removed.
 	self._watchdogTimers[timeoutKey] = timeoutTimer
+	if supersedeKey then
+		-- A still-running older run could otherwise finish last and leave its
+		-- stale state applied.
+		local previous = self._latestTasks[supersedeKey]
+		if previous and previous:isRunning() then
+			logger.f("Terminating superseded run of %s", cmd)
+			previous:terminate()
+		end
+		self._latestTasks[supersedeKey] = task
+	end
 	local startOk = pcall(function() task:start() end)
 	if not startOk then logger.w("Failed to start task") end
 end
 
-function obj:_execute(cmd, args)
+function obj:_execute(cmd, args, supersedeKey)
 	if not cmd then
 		logger.e("No command provided")
 		return
 	end
-	self:_executeAsyncCmd(cmd, args)
+	self:_executeAsyncCmd(cmd, args, supersedeKey)
 end
 
 function obj:_executeAfter(cmd, args, delay, hookType, immediate)
@@ -133,14 +147,15 @@ function obj:_executeAfter(cmd, args, delay, hookType, immediate)
 		self._timers[timerKey] = nil
 	end
 
+	local supersedeKey = LATEST_WINS_HOOKS[hookType] and timerKey or nil
 	if immediate or delay <= 0 then
-		self:_execute(cmd, args)
+		self:_execute(cmd, args, supersedeKey)
 		return
 	end
 
 	logger.df("Scheduling command with delay: %f seconds for key: %s", delay, timerKey)
 	self._timers[timerKey] = hs.timer.doAfter(delay, function()
-		self:_execute(cmd, args)
+		self:_execute(cmd, args, supersedeKey)
 		self._timers[timerKey] = nil
 	end)
 end
