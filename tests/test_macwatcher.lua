@@ -254,6 +254,34 @@ describe("MacWatcher Spoon", function()
 		assertExecuted(w._executed, 1, "theme-based-setup", { "light" })
 	end)
 
+	it("cooldown lets resume run again once a suspend happened in between", function()
+		overrideExecute(w)
+		w.cooldown = 30
+		w:whenResume({ "start" }, 0)
+		w:whenSuspend({ "stop" }, 0)
+
+		mock._setTime(100)
+		w:_execHooks("resume")
+		mock._setTime(102)
+		w:_execHooks("suspend")
+		mock._setTime(104)
+		w:_execHooks("resume")
+
+		assert.are.same({ "start", "stop", "start" }, { w._executed[1].cmd, w._executed[2].cmd, w._executed[3].cmd })
+	end)
+
+	it("default cooldown absorbs the ~10 s spread of one wake's resume events", function()
+		overrideExecute(w)
+		w:whenResume({ "start" }, 0)
+
+		mock._setTime(100)
+		w:_execHooks("resume")
+		mock._setTime(110)
+		w:_execHooks("resume")
+
+		assert.are.equal(1, #w._executed)
+	end)
+
 	it("cooldown allows re-execution when args differ for same hook", function()
 		overrideExecute(w)
 		w.cooldown = 5
@@ -545,21 +573,21 @@ describe("MacWatcher Spoon", function()
 		overrideExecute(w)
 		w.cooldown = 5
 		w:whenResume({ "r" }, 0)
-		w:whenSuspend({ "s" }, 0)
+		w:onWifiChange({ "w" }, 0)
 
 		mock._setTime(100)
 		w:_execHooks("resume")
-		w:_execHooks("suspend")
+		w:_execHooks("wifi", { "Home" })
 		assert.are.equal(2, #w._executed)
 
 		mock._setTime(102)
 		w:_execHooks("resume") -- blocked by cooldown
-		w:_execHooks("suspend") -- blocked by cooldown
+		w:_execHooks("wifi", { "Home" }) -- blocked by cooldown
 		assert.are.equal(2, #w._executed)
 
 		mock._setTime(106)
 		w:_execHooks("resume") -- past cooldown
-		w:_execHooks("suspend") -- past cooldown
+		w:_execHooks("wifi", { "Home" }) -- past cooldown
 		assert.are.equal(4, #w._executed)
 	end)
 
@@ -621,5 +649,12 @@ describe("MacWatcher Spoon", function()
 		w:stop()
 		assert.are.equal(1, #mock._executed)
 		assert.are.equal("'echo' 'it'\\''s alive'", mock._executed[1])
+	end)
+
+	it("stop() expands a leading ~ in whenStop commands", function()
+		w:whenStop({ "~/bin/work-focus", "stop" })
+		w:start()
+		w:stop()
+		assert.are.equal("'" .. os.getenv("HOME") .. "/bin/work-focus' 'stop'", mock._executed[1])
 	end)
 end)

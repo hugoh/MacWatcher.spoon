@@ -48,7 +48,7 @@ git clone https://github.com/hugoh/MacWatcher.spoon.git
 local macWatcher = hs.loadSpoon("MacWatcher")
 
 -- Configure default settings (optional)
-macWatcher.cooldown = 5          -- Minimum seconds between hook executions
+macWatcher.cooldown = 30         -- Minimum seconds between hook executions
 macWatcher.taskTimeout = 30      -- Timeout for command execution
 
 -- Set up event hooks

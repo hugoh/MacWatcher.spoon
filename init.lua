@@ -27,6 +27,8 @@ local THEME = "theme"
 -- args, so a stale state can't run after a newer one already superseded it.
 local LATEST_WINS_HOOKS = { [WIFI] = true, [THEME] = true }
 
+local OPPOSITE_HOOKS = { [RESUME] = SUSPEND, [SUSPEND] = RESUME }
+
 obj.suspendWatcher = nil
 obj.wifiWatcher = nil
 obj.themeWatcher = nil
@@ -43,8 +45,9 @@ obj._timerSeq = 0
 obj._latestTasks = {}
 --- MacWatcher.cooldown
 --- Variable
---- Minimum seconds between repeated hook executions for the same event (default: 5).
-obj.cooldown = 5
+--- Minimum seconds between repeated hook executions for the same event (default: 30).
+--- A resume or suspend always runs if the other one fired since.
+obj.cooldown = 30
 obj._cooldownState = {}
 --- MacWatcher.taskTimeout
 --- Variable
@@ -54,6 +57,9 @@ obj.taskTimeout = 30
 local logger = hs.logger.new(obj.name, "info")
 
 local function shellQuote(s) return "'" .. s:gsub("'", "'\\''") .. "'" end
+
+-- hs.task expands ~ itself, but a quoted path passed to the shell would not.
+local function expandHome(path) return (path:gsub("^~/", os.getenv("HOME") .. "/")) end
 
 local function debugOut(label, data)
 	if logger.level < 4 then return end
@@ -297,6 +303,8 @@ function obj:_execHooks(hookType, args, force, immediate)
 		logger.df("Resetting hooks cooldown for %s with args %s", hookType, hs.inspect(args))
 	end
 	self._cooldownState[hookType] = { args = args, time = currentTime }
+	local opposite = OPPOSITE_HOOKS[hookType]
+	if opposite then self._cooldownState[opposite] = nil end
 	logger.df("Executing hooks from %s", hookType)
 	hs.fnutils.each(self.hooks[hookType], function(item) self:_executeCmd(item, args, hookType, immediate) end)
 end
@@ -433,7 +441,7 @@ function obj:stop()
 	self:_execHooks(SUSPEND, nil, true, true)
 	self:_cancelAllTimers()
 	for _, item in ipairs(self.hooks[STOP]) do
-		local parts = { shellQuote(item.cmd) }
+		local parts = { shellQuote(expandHome(item.cmd)) }
 		for _, arg in ipairs(item.args) do
 			table.insert(parts, shellQuote(arg))
 		end
