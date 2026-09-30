@@ -230,7 +230,9 @@ function obj:whenSuspend(cmd, delay) return self:_cmdAdd(SUSPEND, cmd, delay) en
 
 --- MacWatcher:onWifiChange(cmd[, delay]) -> MacWatcher
 --- Method
---- Register a command to run when the WiFi network changes.
+--- Register a command to run when the WiFi network changes, or when the system
+--- resumes (the SSID may have changed while asleep; unchanged SSIDs are deduped
+--- by the cooldown).
 --- The current SSID is appended as an extra argument to the command.
 ---
 --- Parameters:
@@ -319,6 +321,7 @@ function obj:_caffeinateWatcherCallback(event)
 	then
 		logger.i("Executing resume hooks")
 		self:_execHooks(RESUME)
+		self:_ssidChangedCallback()
 		self:_themeChangedCallback()
 	elseif
 		event == hs.caffeinate.watcher.screensaverDidStart
@@ -336,7 +339,11 @@ function obj:_caffeinateWatcherCallback(event)
 end
 
 function obj:_ssidChangedCallback()
-	local currentSSID = hs.wifi.currentNetwork() or ""
+	local currentSSID = hs.wifi.currentNetwork()
+	if not currentSSID then
+		logger.w("No SSID: disconnected, or Hammerspoon lacks Location Services permission")
+		currentSSID = ""
+	end
 	logger.f("Executing WiFi hooks for SSID '%s'", currentSSID)
 	self:_execHooks(WIFI, { currentSSID })
 end

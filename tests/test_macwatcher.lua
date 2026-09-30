@@ -334,6 +334,37 @@ describe("MacWatcher Spoon", function()
 		assertExecuted(w._executed, 1, "theme", { "dark" })
 	end)
 
+	it("_caffeinateWatcherCallback also fires WiFi hooks on resume events", function()
+		overrideExecute(w)
+		mock._setSSID("home")
+		w:onWifiChange({ "net" }, 0)
+
+		w:_caffeinateWatcherCallback(hs.caffeinate.watcher.screensDidWake)
+
+		assert.are.equal(1, #w._executed)
+		assertExecuted(w._executed, 1, "net", { "home" })
+	end)
+
+	it("_ssidChangedCallback warns when the SSID is unavailable", function()
+		local capturedLogger
+		local origNew = hs.logger.new
+		hs.logger.new = function(...)
+			capturedLogger = origNew(...)
+			return capturedLogger
+		end
+		local w2 = dofile("init.lua")
+		hs.logger.new = origNew
+		mock._setSSID(nil)
+
+		w2:_ssidChangedCallback()
+
+		local warned = false
+		for _, entry in ipairs(capturedLogger._logs) do
+			if entry.kind == "w" and entry.msg:find("Location Services", 1, true) then warned = true end
+		end
+		assert.is_true(warned)
+	end)
+
 	it("start initializes the theme watcher and fires theme hooks", function()
 		overrideExecute(w)
 		mock._setInterfaceStyle("Dark")

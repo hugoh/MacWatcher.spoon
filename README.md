@@ -61,6 +61,9 @@ macWatcher
 
 -- Start monitoring
 macWatcher:start()
+
+-- Run suspend and whenStop hooks when Hammerspoon quits or reloads
+hs.shutdownCallback = function() macWatcher:stop() end
 ```
 
 ## API documentation
