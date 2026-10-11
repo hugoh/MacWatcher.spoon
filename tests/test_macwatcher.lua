@@ -1,6 +1,18 @@
--- Busted tests for MacWatcher Spoon using the mock hs environment
+-- Busted tests for MacWatcher Spoon using the shared hs_mock from spoon-tools
 
-local mock = dofile("tests/mock_hs.lua")
+local hs_mock = require("hs_mock")
+
+local ctl
+
+local function setup()
+	local hs
+	hs, ctl = hs_mock.new()
+	_G.hs = hs
+	-- Tasks complete straight away with exit code 0 unless a test says otherwise.
+	ctl.onTask = function() return 0, "", "" end
+	-- Tests start in dark mode, the case most theme tests exercise.
+	ctl.interfaceStyle = "Dark"
+end
 
 describe("MacWatcher Spoon", function()
 	local w
@@ -16,7 +28,7 @@ describe("MacWatcher Spoon", function()
 	end
 
 	before_each(function()
-		mock.setup()
+		setup()
 		w = dofile("init.lua")
 	end)
 
@@ -57,15 +69,15 @@ describe("MacWatcher Spoon", function()
 		w:whenResume({ "x" }, 0)
 
 		hs.timer.secondsSinceEpoch() -- ensure function exists
-		mock._setTime(100)
+		ctl.now = 100
 		w:_execHooks("resume")
 		assert.are.equal(1, #w._executed)
 
-		mock._setTime(102)
+		ctl.now = 102
 		w:_execHooks("resume")
 		assert.are.equal(1, #w._executed)
 
-		mock._setTime(106)
+		ctl.now = 106
 		w:_execHooks("resume")
 		assert.are.equal(2, #w._executed)
 	end)
@@ -73,15 +85,15 @@ describe("MacWatcher Spoon", function()
 	it("start initializes watchers and triggers initial hooks", function()
 		overrideExecute(w)
 
-		mock._setSSID("HomeNet")
+		ctl.wifiNetwork = "HomeNet"
 
 		w:whenResume({ "echo", "r" }, 0)
 		w:onWifiChange({ "echo", "w" }, 0)
 
 		w:start()
 
-		assert.is_true(w.suspendWatcher ~= nil and w.suspendWatcher._started == true)
-		assert.is_true(w.wifiWatcher ~= nil and w.wifiWatcher._started == true)
+		assert.is_true(w.suspendWatcher ~= nil and w.suspendWatcher:isRunning() == true)
+		assert.is_true(w.wifiWatcher ~= nil and w.wifiWatcher:isRunning() == true)
 
 		assert.are.equal(2, #w._executed)
 		-- Execution order: resume first, then wifi
@@ -92,7 +104,7 @@ describe("MacWatcher Spoon", function()
 	it("_ssidChangedCallback passes current SSID", function()
 		overrideExecute(w)
 
-		mock._setSSID("Office")
+		ctl.wifiNetwork = "Office"
 		w:onWifiChange({ "echo" }, 0)
 		w:_ssidChangedCallback()
 
@@ -127,7 +139,7 @@ describe("MacWatcher Spoon", function()
 		w:_executeAfter("echo", { "a" }, 5)
 		local t2 = w._timers[key]
 		assert.is_true(t2 ~= nil and t2 ~= t1)
-		assert.is_true(t1._stopped == true)
+		assert.is_true(t1:running() == false)
 
 		-- Fire the second timer; should execute once with latest args
 		t2:fire()
@@ -148,8 +160,8 @@ describe("MacWatcher Spoon", function()
 			table.insert(timers, t)
 		end
 		assert.are.equal(2, #timers)
-		assert.is_false(timers[1]._stopped)
-		assert.is_false(timers[2]._stopped)
+		assert.is_true(timers[1]:running())
+		assert.is_true(timers[2]:running())
 
 		for _, t in ipairs(timers) do
 			t:fire()
@@ -224,7 +236,7 @@ describe("MacWatcher Spoon", function()
 			table.insert(timers, t)
 		end
 		assert.are.equal(1, #timers)
-		assert.is_true(t1._stopped == true)
+		assert.is_true(t1:running() == false)
 
 		timers[1]:fire()
 		assert.are.equal(1, #w._executed)
@@ -247,7 +259,7 @@ describe("MacWatcher Spoon", function()
 			table.insert(timers, t)
 		end
 		assert.are.equal(1, #timers)
-		assert.is_true(t1._stopped == true)
+		assert.is_true(t1:running() == false)
 
 		timers[1]:fire()
 		assert.are.equal(1, #w._executed)
@@ -260,11 +272,11 @@ describe("MacWatcher Spoon", function()
 		w:whenResume({ "start" }, 0)
 		w:whenSuspend({ "stop" }, 0)
 
-		mock._setTime(100)
+		ctl.now = 100
 		w:_execHooks("resume")
-		mock._setTime(102)
+		ctl.now = 102
 		w:_execHooks("suspend")
-		mock._setTime(104)
+		ctl.now = 104
 		w:_execHooks("resume")
 
 		assert.are.same({ "start", "stop", "start" }, { w._executed[1].cmd, w._executed[2].cmd, w._executed[3].cmd })
@@ -274,9 +286,9 @@ describe("MacWatcher Spoon", function()
 		overrideExecute(w)
 		w:whenResume({ "start" }, 0)
 
-		mock._setTime(100)
+		ctl.now = 100
 		w:_execHooks("resume")
-		mock._setTime(110)
+		ctl.now = 110
 		w:_execHooks("resume")
 
 		assert.are.equal(1, #w._executed)
@@ -288,18 +300,18 @@ describe("MacWatcher Spoon", function()
 
 		w:whenResume({ "x" }, 0)
 
-		mock._setTime(100)
+		ctl.now = 100
 		w:_execHooks("resume", { "a" })
 		assert.are.equal(1, #w._executed)
 
-		mock._setTime(101)
+		ctl.now = 101
 		w:_execHooks("resume", { "b" })
 		assert.are.equal(2, #w._executed)
 	end)
 
 	it("onThemeChange and _themeChangedCallback pass current appearance", function()
 		overrideExecute(w)
-		mock._setInterfaceStyle("Dark")
+		ctl.interfaceStyle = "Dark"
 
 		w:onThemeChange({ "echo" }, 0)
 		w:_themeChangedCallback()
@@ -310,7 +322,7 @@ describe("MacWatcher Spoon", function()
 
 	it("_themeChangedCallback reports light appearance when not Dark", function()
 		overrideExecute(w)
-		mock._setInterfaceStyle("")
+		ctl.interfaceStyle = nil -- light: macOS reports no style
 
 		w:onThemeChange({ "echo" }, 0)
 		w:_themeChangedCallback()
@@ -325,7 +337,7 @@ describe("MacWatcher Spoon", function()
 
 	it("_caffeinateWatcherCallback also fires theme hooks on resume events", function()
 		overrideExecute(w)
-		mock._setInterfaceStyle("Dark")
+		ctl.interfaceStyle = "Dark"
 		w:onThemeChange({ "theme" }, 0)
 
 		w:_caffeinateWatcherCallback(hs.caffeinate.watcher.screensDidWake)
@@ -336,7 +348,7 @@ describe("MacWatcher Spoon", function()
 
 	it("_caffeinateWatcherCallback also fires WiFi hooks on resume events", function()
 		overrideExecute(w)
-		mock._setSSID("home")
+		ctl.wifiNetwork = "home"
 		w:onWifiChange({ "net" }, 0)
 
 		w:_caffeinateWatcherCallback(hs.caffeinate.watcher.screensDidWake)
@@ -346,33 +358,26 @@ describe("MacWatcher Spoon", function()
 	end)
 
 	it("_ssidChangedCallback warns when the SSID is unavailable", function()
-		local capturedLogger
-		local origNew = hs.logger.new
-		hs.logger.new = function(...)
-			capturedLogger = origNew(...)
-			return capturedLogger
-		end
 		local w2 = dofile("init.lua")
-		hs.logger.new = origNew
-		mock._setSSID(nil)
+		ctl.wifiNetwork = nil
 
 		w2:_ssidChangedCallback()
 
 		local warned = false
-		for _, entry in ipairs(capturedLogger._logs) do
-			if entry.kind == "w" and entry.msg:find("Location Services", 1, true) then warned = true end
+		for _, entry in ipairs(ctl.logs) do
+			if entry.level == "warning" and entry.message:find("Location Services", 1, true) then warned = true end
 		end
 		assert.is_true(warned)
 	end)
 
 	it("start initializes the theme watcher and fires theme hooks", function()
 		overrideExecute(w)
-		mock._setInterfaceStyle("Dark")
+		ctl.interfaceStyle = "Dark"
 		w:onThemeChange({ "theme" }, 0)
 
 		w:start()
 
-		assert.is_true(w.themeWatcher ~= nil and w.themeWatcher._started == true)
+		assert.is_true(w.themeWatcher ~= nil and w.themeWatcher:isRunning() == true)
 		local found = false
 		for _, entry in ipairs(w._executed) do
 			if entry.cmd == "theme" then found = true end
@@ -384,7 +389,7 @@ describe("MacWatcher Spoon", function()
 		w:start()
 		local tw = w.themeWatcher
 		w:stop()
-		assert.is_true(tw._started == false)
+		assert.is_true(tw:isRunning() == false)
 		assert.is_nil(w.themeWatcher)
 	end)
 
@@ -418,29 +423,20 @@ describe("MacWatcher Spoon", function()
 		w:_cancelAllTimers()
 		assert.are.equal(0, #w._timers)
 		for _, t in ipairs(timers) do
-			assert.is_true(t._stopped)
+			assert.is_false(t:running())
 		end
 	end)
 
 	it("stop() logs using self.name, not the module-level obj.name (multi-instance safe)", function()
-		-- Capture the logger instance created when init.lua is loaded, so we can
-		-- inspect what it logged.
-		local capturedLogger
-		local origNew = hs.logger.new
-		hs.logger.new = function(...)
-			capturedLogger = origNew(...)
-			return capturedLogger
-		end
 		local w2 = dofile("init.lua")
-		hs.logger.new = origNew
 
 		local instance = setmetatable({ name = "OtherInstance" }, { __index = w2 })
 		instance:start()
 		instance:stop()
 
 		local found = false
-		for _, entry in ipairs(capturedLogger._logs) do
-			if entry.msg == "Stopping OtherInstance v" .. w2.version then found = true end
+		for _, entry in ipairs(ctl.logs) do
+			if entry.message == "Stopping OtherInstance v" .. w2.version then found = true end
 		end
 		assert.is_true(found)
 	end)
@@ -449,8 +445,8 @@ describe("MacWatcher Spoon", function()
 		w:start()
 		local sw, ww = w.suspendWatcher, w.wifiWatcher
 		w:stop()
-		assert.is_true(sw._started == false)
-		assert.is_true(ww._started == false)
+		assert.is_true(sw:isRunning() == false)
+		assert.is_true(ww:isRunning() == false)
 		assert.is_nil(w.suspendWatcher)
 		assert.is_nil(w.wifiWatcher)
 	end)
@@ -470,10 +466,10 @@ describe("MacWatcher Spoon", function()
 		overrideExecute(w)
 		w.cooldown = 5
 		w:whenSuspend({ "halt" }, 0)
-		mock._setTime(100)
+		ctl.now = 100
 		w:_execHooks("suspend") -- simulate a hardware suspend event
 		assert.are.equal(1, #w._executed)
-		mock._setTime(102) -- still within cooldown
+		ctl.now = 102 -- still within cooldown
 		w:start()
 		w:stop() -- must fire despite cooldown
 		assert.are.equal(2, #w._executed)
@@ -506,7 +502,7 @@ describe("MacWatcher Spoon", function()
 
 	it("_ssidChangedCallback passes empty string when SSID is nil", function()
 		overrideExecute(w)
-		mock._setSSID(nil)
+		ctl.wifiNetwork = nil
 		w:onWifiChange({ "net" }, 0)
 		w:_ssidChangedCallback()
 		assert.are.same({ "" }, w._executed[1].args)
@@ -521,7 +517,7 @@ describe("MacWatcher Spoon", function()
 			hs.caffeinate.watcher.sessionDidBecomeActive,
 		}
 		for _, event in ipairs(resumeEvents) do
-			mock.setup()
+			setup()
 			w = dofile("init.lua")
 			overrideExecute(w)
 			w:whenResume({ "r" }, 0)
@@ -540,7 +536,7 @@ describe("MacWatcher Spoon", function()
 			hs.caffeinate.watcher.sessionDidResignActive,
 		}
 		for _, event in ipairs(suspendEvents) do
-			mock.setup()
+			setup()
 			w = dofile("init.lua")
 			overrideExecute(w)
 			w:whenSuspend({ "s" }, 0)
@@ -574,7 +570,7 @@ describe("MacWatcher Spoon", function()
 	end)
 
 	it("_executeAsyncCmd logs error on non-zero exit code", function()
-		mock._setTaskExitCode(1)
+		ctl.onTask = function() return 1, "", "" end
 		w:_executeAsyncCmd("fail-cmd", {})
 		-- error is logged; spoon should not throw
 		assert.is_true(true)
@@ -591,11 +587,11 @@ describe("MacWatcher Spoon", function()
 		w.cooldown = 5
 		w:whenResume({ "x" }, 0)
 
-		mock._setTime(100)
+		ctl.now = 100
 		w:_execHooks("resume")
 		assert.are.equal(1, #w._executed)
 
-		mock._setTime(105) -- exactly at boundary: last == cooldown, should NOT be blocked
+		ctl.now = 105 -- exactly at boundary: last == cooldown, should NOT be blocked
 		w:_execHooks("resume")
 		assert.are.equal(2, #w._executed)
 	end)
@@ -606,17 +602,17 @@ describe("MacWatcher Spoon", function()
 		w:whenResume({ "r" }, 0)
 		w:onWifiChange({ "w" }, 0)
 
-		mock._setTime(100)
+		ctl.now = 100
 		w:_execHooks("resume")
 		w:_execHooks("wifi", { "Home" })
 		assert.are.equal(2, #w._executed)
 
-		mock._setTime(102)
+		ctl.now = 102
 		w:_execHooks("resume") -- blocked by cooldown
 		w:_execHooks("wifi", { "Home" }) -- blocked by cooldown
 		assert.are.equal(2, #w._executed)
 
-		mock._setTime(106)
+		ctl.now = 106
 		w:_execHooks("resume") -- past cooldown
 		w:_execHooks("wifi", { "Home" }) -- past cooldown
 		assert.are.equal(4, #w._executed)
@@ -638,16 +634,16 @@ describe("MacWatcher Spoon", function()
 		w:whenStop({ "work-focus", "stop" })
 		w:start()
 		w:stop()
-		assert.are.equal(1, #mock._executed)
-		assert.are.equal("'work-focus' 'stop'", mock._executed[1])
+		assert.are.equal(1, #ctl.executed)
+		assert.are.equal("'work-focus' 'stop'", ctl.executed[1])
 	end)
 
 	it("stop() runs whenStop hooks with no args", function()
 		w:whenStop({ "work-focus" })
 		w:start()
 		w:stop()
-		assert.are.equal(1, #mock._executed)
-		assert.are.equal("'work-focus'", mock._executed[1])
+		assert.are.equal(1, #ctl.executed)
+		assert.are.equal("'work-focus'", ctl.executed[1])
 	end)
 
 	it("stop() runs multiple whenStop hooks in order", function()
@@ -655,37 +651,37 @@ describe("MacWatcher Spoon", function()
 		w:whenStop({ "cmd-b", "2", "3" })
 		w:start()
 		w:stop()
-		assert.are.equal(2, #mock._executed)
-		assert.are.equal("'cmd-a' '1'", mock._executed[1])
-		assert.are.equal("'cmd-b' '2' '3'", mock._executed[2])
+		assert.are.equal(2, #ctl.executed)
+		assert.are.equal("'cmd-a' '1'", ctl.executed[1])
+		assert.are.equal("'cmd-b' '2' '3'", ctl.executed[2])
 	end)
 
 	it("stop() does not run whenStop hooks if none registered", function()
 		w:start()
 		w:stop()
-		assert.are.equal(0, #mock._executed)
+		assert.are.equal(0, #ctl.executed)
 	end)
 
 	it("stop() shell-quotes whenStop args that contain spaces", function()
 		w:whenStop({ "open", "/Applications/My App.app" })
 		w:start()
 		w:stop()
-		assert.are.equal(1, #mock._executed)
-		assert.are.equal("'open' '/Applications/My App.app'", mock._executed[1])
+		assert.are.equal(1, #ctl.executed)
+		assert.are.equal("'open' '/Applications/My App.app'", ctl.executed[1])
 	end)
 
 	it("stop() shell-quotes whenStop args that contain single quotes", function()
 		w:whenStop({ "echo", "it's alive" })
 		w:start()
 		w:stop()
-		assert.are.equal(1, #mock._executed)
-		assert.are.equal("'echo' 'it'\\''s alive'", mock._executed[1])
+		assert.are.equal(1, #ctl.executed)
+		assert.are.equal("'echo' 'it'\\''s alive'", ctl.executed[1])
 	end)
 
 	it("stop() expands a leading ~ in whenStop commands", function()
 		w:whenStop({ "~/bin/work-focus", "stop" })
 		w:start()
 		w:stop()
-		assert.are.equal("'" .. os.getenv("HOME") .. "/bin/work-focus' 'stop'", mock._executed[1])
+		assert.are.equal("'" .. os.getenv("HOME") .. "/bin/work-focus' 'stop'", ctl.executed[1])
 	end)
 end)
