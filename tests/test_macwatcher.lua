@@ -112,6 +112,36 @@ describe("MacWatcher Spoon", function()
 		assert.are.same({ "Office" }, w._executed[1].args)
 	end)
 
+	it("runs a Lua function hook with the current SSID", function()
+		local received = {}
+		ctl.wifiNetwork = "Office"
+		w:onWifiChange(function(ssid) table.insert(received, ssid) end, 0)
+
+		w:_ssidChangedCallback()
+
+		assert.are.same({ "Office" }, received)
+	end)
+
+	it("keeps running other hooks when a function hook errors", function()
+		local ran = false
+		ctl.wifiNetwork = "Office"
+		w:onWifiChange(function() error("boom") end, 0)
+		w:onWifiChange(function() ran = true end, 0)
+
+		w:_ssidChangedCallback()
+
+		assert.is_true(ran)
+	end)
+
+	it("runs a Lua function registered with whenStop", function()
+		local stopped = false
+		w:whenStop(function() stopped = true end)
+
+		w:stop()
+
+		assert.is_true(stopped)
+	end)
+
 	it("_caffeinateWatcherCallback maps events to resume/suspend", function()
 		overrideExecute(w)
 
