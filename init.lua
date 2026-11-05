@@ -137,6 +137,11 @@ function obj:_execute(cmd, args, supersedeKey)
 		logger.e("No command provided")
 		return
 	end
+	if type(cmd) == "function" then
+		local ok, err = pcall(cmd, table.unpack(args))
+		if not ok then logger.ef("Hook function failed: %s", tostring(err)) end
+		return
+	end
 	self:_executeAsyncCmd(cmd, args, supersedeKey)
 end
 
@@ -198,8 +203,12 @@ end
 function obj:_cmdAdd(hookType, cmd, delay)
 	if delay == nil then delay = 0 end
 	logger.df("Adding to %s: %s; delay: %d", hookType, hs.inspect(cmd), delay)
-	local realCmd = cmd[1]
-	local cmdArgs = { table.unpack(cmd, 2) }
+	local realCmd, cmdArgs
+	if type(cmd) == "function" then
+		realCmd, cmdArgs = cmd, {}
+	else
+		realCmd, cmdArgs = cmd[1], { table.unpack(cmd, 2) }
+	end
 	table.insert(self.hooks[hookType], { cmd = realCmd, args = cmdArgs, delay = delay })
 	return self
 end
@@ -209,7 +218,7 @@ end
 --- Register a command to run after the system resumes from sleep or unlocks.
 ---
 --- Parameters:
----  * cmd - A table where the first element is the executable path and remaining elements are arguments
+---  * cmd - A table where the first element is the executable path and remaining elements are arguments, or a Lua function called with the event's extra argument (if any); an error in a function is logged and does not stop other hooks
 ---  * delay - (optional) Seconds to wait before executing; default 0
 ---
 --- Returns:
@@ -221,7 +230,7 @@ function obj:whenResume(cmd, delay) return self:_cmdAdd(RESUME, cmd, delay) end
 --- Register a command to run before the system sleeps or locks.
 ---
 --- Parameters:
----  * cmd - A table where the first element is the executable path and remaining elements are arguments
+---  * cmd - A table where the first element is the executable path and remaining elements are arguments, or a Lua function called with the event's extra argument (if any); an error in a function is logged and does not stop other hooks
 ---  * delay - (optional) Seconds to wait before executing; default 0
 ---
 --- Returns:
@@ -236,7 +245,7 @@ function obj:whenSuspend(cmd, delay) return self:_cmdAdd(SUSPEND, cmd, delay) en
 --- The current SSID is appended as an extra argument to the command.
 ---
 --- Parameters:
----  * cmd - A table where the first element is the executable path and remaining elements are arguments
+---  * cmd - A table where the first element is the executable path and remaining elements are arguments, or a Lua function called with the event's extra argument (if any); an error in a function is logged and does not stop other hooks
 ---  * delay - (optional) Seconds to wait before executing; default 0
 ---
 --- Returns:
@@ -251,7 +260,7 @@ function obj:onWifiChange(cmd, delay) return self:_cmdAdd(WIFI, cmd, delay) end
 --- The current appearance ("light" or "dark") is appended as an extra argument to the command.
 ---
 --- Parameters:
----  * cmd - A table where the first element is the executable path and remaining elements are arguments
+---  * cmd - A table where the first element is the executable path and remaining elements are arguments, or a Lua function called with the event's extra argument (if any); an error in a function is logged and does not stop other hooks
 ---  * delay - (optional) Seconds to wait before executing; default 0
 ---
 --- Returns:
@@ -264,7 +273,7 @@ function obj:onThemeChange(cmd, delay) return self:_cmdAdd(THEME, cmd, delay) en
 --- Useful for teardown scripts that must complete before the process exits.
 ---
 --- Parameters:
----  * cmd - A table where the first element is the executable path and remaining elements are arguments
+---  * cmd - A table where the first element is the executable path and remaining elements are arguments, or a Lua function called with the event's extra argument (if any); an error in a function is logged and does not stop other hooks
 ---
 --- Returns:
 ---  * The MacWatcher object, for method chaining
@@ -448,14 +457,19 @@ function obj:stop()
 	self:_execHooks(SUSPEND, nil, true, true)
 	self:_cancelAllTimers()
 	for _, item in ipairs(self.hooks[STOP]) do
-		local parts = { shellQuote(expandHome(item.cmd)) }
-		for _, arg in ipairs(item.args) do
-			table.insert(parts, shellQuote(arg))
+		if type(item.cmd) == "function" then
+			local ok, err = pcall(item.cmd)
+			if not ok then logger.ef("Stop hook function failed: %s", tostring(err)) end
+		else
+			local parts = { shellQuote(expandHome(item.cmd)) }
+			for _, arg in ipairs(item.args) do
+				table.insert(parts, shellQuote(arg))
+			end
+			local fullCmd = table.concat(parts, " ")
+			logger.i("Executing stop command: " .. fullCmd)
+			local execOk, execErr = pcall(hs.execute, fullCmd, true)
+			if not execOk then logger.w("Failed to execute stop command '" .. fullCmd .. "': " .. tostring(execErr)) end
 		end
-		local fullCmd = table.concat(parts, " ")
-		logger.i("Executing stop command: " .. fullCmd)
-		local execOk, execErr = pcall(hs.execute, fullCmd, true)
-		if not execOk then logger.w("Failed to execute stop command '" .. fullCmd .. "': " .. tostring(execErr)) end
 	end
 end
 
